@@ -1,0 +1,25 @@
+{
+  "version": "SA32-v1",
+  "date": "2026-11-20",
+  "description": "Synthetic SmartCampus AI multilingual evaluation dataset; not university ground truth",
+  "case_count": 72,
+  "scenario_count": 60,
+  "language_counts": {
+    "arabizi": 18,
+    "derja": 18,
+    "fr": 18,
+    "mixed": 18
+  },
+  "category_counts": {
+    "boundaries": 6,
+    "intent": 10,
+    "memory": 24,
+    "orientation": 8,
+    "profiling": 8,
+    "reliability": 8,
+    "welcome": 8
+  },
+  "automatically_checkable_case_count": 12,
+  "dataset_sha256": "3c5cf2e7b91f6723add30d0898a815922646f30d1810d4b92f84537991c0c362",
+  "review_required": "All cases require human quality review; lexical tests only detect recall anchors"
+}
