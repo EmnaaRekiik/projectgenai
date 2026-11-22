@@ -18,10 +18,20 @@ def ready(db: Session = Depends(get_db)) -> dict[str, str]:
         db.execute(text("SELECT 1"))
         inspector = inspect(db.get_bind())
         required = (
-            "institutions", "programs", "visitor_sessions", "conversation_messages",
-            "staff_users", "staff_sessions", "program_specializations", "program_courses",
-            "program_admission_rules", "program_tuition", "candidate_users", "candidate_sessions",
-            "candidate_email_tokens", "rate_limit_buckets",
+            "institutions",
+            "programs",
+            "visitor_sessions",
+            "conversation_messages",
+            "staff_users",
+            "staff_sessions",
+            "program_specializations",
+            "program_courses",
+            "program_admission_rules",
+            "program_tuition",
+            "candidate_users",
+            "candidate_sessions",
+            "candidate_email_tokens",
+            "rate_limit_buckets",
         )
         if not all(inspector.has_table(table) for table in required):
             raise RuntimeError("Required migrations have not been applied")
@@ -30,4 +40,10 @@ def ready(db: Session = Depends(get_db)) -> dict[str, str]:
             raise RuntimeError("Chat migration 0003 has not been applied")
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Database or schema not ready") from exc
-    return {"status": "ready", "database": "connected", "schema": "catalogue-v2", "visitor_schema": "visitor-v2", "auth_schema": "staff-and-candidate-v1"}
+    return {
+        "status": "ready",
+        "database": "connected",
+        "schema": "catalogue-v2",
+        "visitor_schema": "visitor-v2",
+        "auth_schema": "staff-and-candidate-v1",
+    }

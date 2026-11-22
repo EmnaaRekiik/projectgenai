@@ -8,6 +8,7 @@ Run from the repository root:
     python evaluation/run_eval.py --smoke
     python evaluation/run_eval.py --all
 """
+
 from __future__ import annotations
 
 import argparse
@@ -28,18 +29,44 @@ DEFAULT_DATASET = Path(__file__).resolve().with_name("cases.jsonl")
 DEFAULT_RESULTS_DIR = Path(__file__).resolve().with_name("results")
 ALLOWED_LANGUAGES = {"fr", "derja", "arabizi", "mixed"}
 ALLOWED_CATEGORIES = {
-    "welcome", "intent", "profiling", "orientation", "reliability", "boundaries", "memory"
+    "welcome",
+    "intent",
+    "profiling",
+    "orientation",
+    "reliability",
+    "boundaries",
+    "memory",
 }
 SMOKE_SCENARIOS = {
-    "WELCOME-01", "WELCOME-02", "WELCOME-03", "INTENT-08",
-    "RELIABILITY-01", "MEM-01", "MEM-03", "MEM-05"
+    "WELCOME-01",
+    "WELCOME-02",
+    "WELCOME-03",
+    "INTENT-08",
+    "RELIABILITY-01",
+    "MEM-01",
+    "MEM-03",
+    "MEM-05",
 }
 CSV_COLUMNS = [
-    "case_id", "scenario_id", "turn", "language", "category", "model",
-    "prompt", "response", "expected_behavior", "latency_seconds", "api_status",
-    "auto_status", "auto_checks_failed", "language_score_0_to_3",
-    "intent_score_0_to_3", "grounding_score_0_to_3", "memory_score_0_to_3",
-    "safety_score_0_to_3", "reviewer_notes",
+    "case_id",
+    "scenario_id",
+    "turn",
+    "language",
+    "category",
+    "model",
+    "prompt",
+    "response",
+    "expected_behavior",
+    "latency_seconds",
+    "api_status",
+    "auto_status",
+    "auto_checks_failed",
+    "language_score_0_to_3",
+    "intent_score_0_to_3",
+    "grounding_score_0_to_3",
+    "memory_score_0_to_3",
+    "safety_score_0_to_3",
+    "reviewer_notes",
 ]
 
 
@@ -72,7 +99,12 @@ def load_cases(path: Path) -> list[dict[str, Any]]:
         if not isinstance(row, dict):
             raise BenchmarkError(f"Expected JSON object at line {lineno}")
         mandatory_strings = (
-            "case_id", "scenario_id", "language", "category", "prompt", "expected_behavior"
+            "case_id",
+            "scenario_id",
+            "language",
+            "category",
+            "prompt",
+            "expected_behavior",
         )
         for name in mandatory_strings:
             if not isinstance(row.get(name), str) or not row[name].strip():
@@ -94,11 +126,17 @@ def load_cases(path: Path) -> list[dict[str, Any]]:
         ):
             raise BenchmarkError(f"Missing review_criteria: {case_id}")
         checks = row.get("checks")
-        if not isinstance(checks, dict) or set(checks) - {"must_contain_any", "must_contain_all", "must_not_contain"}:
+        if not isinstance(checks, dict) or set(checks) - {
+            "must_contain_any",
+            "must_contain_all",
+            "must_not_contain",
+        }:
             raise BenchmarkError(f"Invalid checks: {case_id}")
         for key, anchors in checks.items():
-            if not isinstance(anchors, list) or not anchors or not all(
-                isinstance(item, str) and item.strip() for item in anchors
+            if (
+                not isinstance(anchors, list)
+                or not anchors
+                or not all(isinstance(item, str) and item.strip() for item in anchors)
             ):
                 raise BenchmarkError(f"Invalid anchors {key}: {case_id}")
         scenarios.setdefault(row["scenario_id"], []).append(row["turn"])
@@ -146,8 +184,9 @@ class HttpChatTransport:
                 "By default only localhost is allowed. Do not send evaluation data to an external API."
             )
 
-    def _json(self, method: str, url: str, *, token: str | None = None,
-              body: dict[str, Any] | None = None) -> dict[str, Any]:
+    def _json(
+        self, method: str, url: str, *, token: str | None = None, body: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         headers = {"Accept": "application/json"}
         if token:
             headers["X-Visitor-Token"] = token
@@ -164,7 +203,9 @@ class HttpChatTransport:
             # Don't print raw upstream bodies, which could echo candidate input.
             raise BenchmarkError(f"Backend returned HTTP {exc.code} ({method})") from exc
         except (error.URLError, TimeoutError, OSError) as exc:
-            raise BenchmarkError(f"Backend connection failed ({method}): {type(exc).__name__}") from exc
+            raise BenchmarkError(
+                f"Backend connection failed ({method}): {type(exc).__name__}"
+            ) from exc
         except (ValueError, UnicodeDecodeError) as exc:
             raise BenchmarkError("Backend returned malformed JSON") from exc
 
@@ -175,17 +216,23 @@ class HttpChatTransport:
         return {"id": session["id"], "token": session["token"]}
 
     def chat(self, session_id: str, token: str, prompt: str) -> dict[str, Any]:
-        return self._json("POST", f"{self.base}/{session_id}/chat", token=token,
-                          body={"content": prompt})
+        return self._json(
+            "POST", f"{self.base}/{session_id}/chat", token=token, body={"content": prompt}
+        )
 
     def delete_session(self, session_id: str, token: str) -> None:
         self._json("DELETE", f"{self.base}/{session_id}", token=token)
 
 
-def selected_groups(cases: list[dict[str, Any]], *, smoke: bool = False,
-                    max_scenarios: int | None = None, language: str | None = None,
-                    category: str | None = None,
-                    scenario_ids: list[str] | None = None) -> OrderedDict[str, list[dict[str, Any]]]:
+def selected_groups(
+    cases: list[dict[str, Any]],
+    *,
+    smoke: bool = False,
+    max_scenarios: int | None = None,
+    language: str | None = None,
+    category: str | None = None,
+    scenario_ids: list[str] | None = None,
+) -> OrderedDict[str, list[dict[str, Any]]]:
     groups: OrderedDict[str, list[dict[str, Any]]] = OrderedDict()
     for case in cases:
         groups.setdefault(case["scenario_id"], []).append(case)
@@ -197,9 +244,13 @@ def selected_groups(cases: list[dict[str, Any]], *, smoke: bool = False,
     if smoke:
         groups = OrderedDict((key, val) for key, val in groups.items() if key in SMOKE_SCENARIOS)
     if language:
-        groups = OrderedDict((key, val) for key, val in groups.items() if all(r["language"] == language for r in val))
+        groups = OrderedDict(
+            (key, val) for key, val in groups.items() if all(r["language"] == language for r in val)
+        )
     if category:
-        groups = OrderedDict((key, val) for key, val in groups.items() if all(r["category"] == category for r in val))
+        groups = OrderedDict(
+            (key, val) for key, val in groups.items() if all(r["category"] == category for r in val)
+        )
     if max_scenarios is not None:
         groups = OrderedDict(list(groups.items())[:max_scenarios])
     if not groups:
@@ -209,22 +260,35 @@ def selected_groups(cases: list[dict[str, Any]], *, smoke: bool = False,
 
 def _blank_result(row: dict[str, Any], status: str, error_note: str = "") -> dict[str, Any]:
     return {
-        "case_id": row["case_id"], "scenario_id": row["scenario_id"],
-        "turn": row["turn"], "language": row["language"], "category": row["category"],
-        "model": "", "prompt": row["prompt"], "response": "",
+        "case_id": row["case_id"],
+        "scenario_id": row["scenario_id"],
+        "turn": row["turn"],
+        "language": row["language"],
+        "category": row["category"],
+        "model": "",
+        "prompt": row["prompt"],
+        "response": "",
         "expected_behavior": row["expected_behavior"],
-        "latency_seconds": None, "api_status": status,
-        "auto_status": status, "auto_checks_failed": [],
-        "language_score_0_to_3": "", "intent_score_0_to_3": "",
-        "grounding_score_0_to_3": "", "memory_score_0_to_3": "",
+        "latency_seconds": None,
+        "api_status": status,
+        "auto_status": status,
+        "auto_checks_failed": [],
+        "language_score_0_to_3": "",
+        "intent_score_0_to_3": "",
+        "grounding_score_0_to_3": "",
+        "memory_score_0_to_3": "",
         "safety_score_0_to_3": "",
-        "reviewer_notes": error_note, "review_criteria": row["review_criteria"],
+        "reviewer_notes": error_note,
+        "review_criteria": row["review_criteria"],
     }
 
 
-def run_benchmark(groups: OrderedDict[str, list[dict[str, Any]]],
-                  transport: ChatTransport, *, progress: bool = True
-                  ) -> tuple[list[dict[str, Any]], list[str]]:
+def run_benchmark(
+    groups: OrderedDict[str, list[dict[str, Any]]],
+    transport: ChatTransport,
+    *,
+    progress: bool = True,
+) -> tuple[list[dict[str, Any]], list[str]]:
     results: list[dict[str, Any]] = []
     cleanup_warnings: list[str] = []
     for index, (scenario_id, turns) in enumerate(groups.items(), 1):
@@ -247,18 +311,22 @@ def run_benchmark(groups: OrderedDict[str, list[dict[str, Any]]],
                         raise BenchmarkError("Unexpected DB message ordering")
                     status, failed = check_response(answer, row["checks"])
                     result = _blank_result(row, status)
-                    result.update({
-                        "api_status": "OK", "auto_status": status,
-                        "model": str(response.get("model", "")),
-                        "response": answer, "latency_seconds": elapsed,
-                        "auto_checks_failed": failed,
-                    })
+                    result.update(
+                        {
+                            "api_status": "OK",
+                            "auto_status": status,
+                            "model": str(response.get("model", "")),
+                            "response": answer,
+                            "latency_seconds": elapsed,
+                            "auto_checks_failed": failed,
+                        }
+                    )
                     results.append(result)
                     if progress:
                         print(f"    {row['case_id']}: {status} ({elapsed}s)", flush=True)
                 except (BenchmarkError, KeyError, IndexError, TypeError, ValueError) as exc:
                     results.append(_blank_result(row, "ERROR", str(exc)))
-                    for skipped in turns[turn_index + 1:]:
+                    for skipped in turns[turn_index + 1 :]:
                         results.append(_blank_result(skipped, "SKIPPED", "Prior turn failed"))
                     if progress:
                         print(f"    {row['case_id']}: ERROR — {exc}", flush=True)
@@ -273,24 +341,34 @@ def run_benchmark(groups: OrderedDict[str, list[dict[str, Any]]],
                 try:
                     transport.delete_session(session["id"], session["token"])
                 except Exception as exc:
-                    cleanup_warnings.append(f"{scenario_id}: cleanup failed ({type(exc).__name__}); manual session purge may be needed")
+                    cleanup_warnings.append(
+                        f"{scenario_id}: cleanup failed ({type(exc).__name__}); manual session purge may be needed"
+                    )
     return results, cleanup_warnings
 
 
-def build_summary(results: list[dict[str, Any]], cleanup_warnings: list[str],
-                  *, dataset_sha: str, scenario_count: int) -> dict[str, Any]:
+def build_summary(
+    results: list[dict[str, Any]],
+    cleanup_warnings: list[str],
+    *,
+    dataset_sha: str,
+    scenario_count: int,
+) -> dict[str, Any]:
     measured = [float(r["latency_seconds"]) for r in results if r["latency_seconds"] is not None]
     autos = Counter(r["auto_status"] for r in results)
     return {
-        "generated_at_utc": utc_now(), "dataset_sha256": dataset_sha,
-        "scenario_count": scenario_count, "case_count": len(results),
+        "generated_at_utc": utc_now(),
+        "dataset_sha256": dataset_sha,
+        "scenario_count": scenario_count,
+        "case_count": len(results),
         "model_names": sorted({r["model"] for r in results if r["model"]}),
         "language_counts": dict(Counter(r["language"] for r in results)),
         "category_counts": dict(Counter(r["category"] for r in results)),
         "auto_status_counts": dict(autos),
         "automatic_anchor_accuracy": (
             round(autos.get("PASS", 0) / (autos.get("PASS", 0) + autos.get("FAIL", 0)), 4)
-            if autos.get("PASS", 0) + autos.get("FAIL", 0) else None
+            if autos.get("PASS", 0) + autos.get("FAIL", 0)
+            else None
         ),
         "latency_seconds_median": round(statistics.median(measured), 2) if measured else None,
         "latency_seconds_p95_nearest_rank": (
@@ -305,12 +383,13 @@ def build_summary(results: list[dict[str, Any]], cleanup_warnings: list[str],
     }
 
 
-def write_report(output_root: Path, results: list[dict[str, Any]],
-                 summary: dict[str, Any]) -> Path:
+def write_report(output_root: Path, results: list[dict[str, Any]], summary: dict[str, Any]) -> Path:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ")
     out = output_root / stamp
     out.mkdir(parents=True, exist_ok=False)
-    (out / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (out / "summary.json").write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     with (out / "results.jsonl").open("w", encoding="utf-8", newline="\n") as stream:
         for row in results:
             stream.write(json.dumps(row, ensure_ascii=False) + "\n")
@@ -329,10 +408,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--base-url", default="http://127.0.0.1:8001/api/v1")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--validate", action="store_true", help="Validate dataset without LLM calls")
-    group.add_argument("--smoke", action="store_true", help="Run a small multilingual live evaluation")
+    group.add_argument(
+        "--smoke", action="store_true", help="Run a small multilingual live evaluation"
+    )
     group.add_argument("--all", action="store_true", help="Run all 72 real model questions")
     parser.add_argument("--max-scenarios", type=int, help="Limit number of complete scenarios")
-    parser.add_argument("--scenario", action="append", default=[], help="Rerun exact scenario ID (repeatable). Full multi-turn scenario is always preserved.")
+    parser.add_argument(
+        "--scenario",
+        action="append",
+        default=[],
+        help="Rerun exact scenario ID (repeatable). Full multi-turn scenario is always preserved.",
+    )
     parser.add_argument("--language", choices=sorted(ALLOWED_LANGUAGES))
     parser.add_argument("--category", choices=sorted(ALLOWED_CATEGORIES))
     parser.add_argument("--timeout", type=int, default=360, help="HTTP timeout per model request")
@@ -351,15 +437,25 @@ def main(argv: list[str] | None = None) -> int:
     try:
         cases = load_cases(args.dataset)
         sha = hashlib.sha256(args.dataset.read_bytes()).hexdigest()
-        print(f"Dataset validated: {len(cases)} cases, "
-              f"{len({row['scenario_id'] for row in cases})} scenarios, SHA256 {sha[:12]}")
+        print(
+            f"Dataset validated: {len(cases)} cases, "
+            f"{len({row['scenario_id'] for row in cases})} scenarios, SHA256 {sha[:12]}"
+        )
         if args.validate:
             print("No model calls were made.")
             return 0
-        groups = selected_groups(cases, smoke=args.smoke, max_scenarios=args.max_scenarios,
-                                 language=args.language, category=args.category, scenario_ids=args.scenario)
+        groups = selected_groups(
+            cases,
+            smoke=args.smoke,
+            max_scenarios=args.max_scenarios,
+            language=args.language,
+            category=args.category,
+            scenario_ids=args.scenario,
+        )
         transport = HttpChatTransport(args.base_url, timeout=args.timeout)
-        print(f"Running {sum(map(len, groups.values()))} live turns across {len(groups)} isolated sessions.")
+        print(
+            f"Running {sum(map(len, groups.values()))} live turns across {len(groups)} isolated sessions."
+        )
         results, warnings = run_benchmark(groups, transport)
         summary = build_summary(results, warnings, dataset_sha=sha, scenario_count=len(groups))
         location = write_report(args.output_dir, results, summary)

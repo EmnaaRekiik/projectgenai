@@ -4,6 +4,7 @@ Revision ID: 0003_chat_lease
 Revises: 0002_visitor_memory
 Create Date: 2026-11-20
 """
+
 import sqlalchemy as sa
 from alembic import op
 
@@ -14,8 +15,12 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("visitor_sessions", sa.Column("chat_request_id", sa.Uuid(as_uuid=True), nullable=True))
-    op.add_column("visitor_sessions", sa.Column("chat_lease_until", sa.DateTime(timezone=True), nullable=True))
+    op.add_column(
+        "visitor_sessions", sa.Column("chat_request_id", sa.Uuid(as_uuid=True), nullable=True)
+    )
+    op.add_column(
+        "visitor_sessions", sa.Column("chat_lease_until", sa.DateTime(timezone=True), nullable=True)
+    )
 
 
 def downgrade() -> None:

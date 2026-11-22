@@ -3,6 +3,7 @@
 Proxy headers are deliberately ignored unless a trusted proxy policy is configured.
 Fixed-window counters are shared across API workers and are pruned by retention.
 """
+
 import hashlib
 import hmac
 import time
@@ -17,13 +18,22 @@ from app.core.config import Settings
 from app.models.rate_limit import RateLimitBucket
 
 
-def throttle_client(db: Session, request: Request, settings: Settings, *, action: str, limit: int, period_seconds: int) -> None:
+def throttle_client(
+    db: Session,
+    request: Request,
+    settings: Settings,
+    *,
+    action: str,
+    limit: int,
+    period_seconds: int,
+) -> None:
     if not settings.admin_api_key:
         raise HTTPException(status_code=503, detail="Rate limiting secret missing")
     client_ip = request.client.host if request.client else "unknown"
     period = int(time.time()) // period_seconds
-    digest = hmac.new(settings.admin_api_key.encode(),
-                      f"{action}:{period}:{client_ip}".encode(), hashlib.sha256).hexdigest()
+    digest = hmac.new(
+        settings.admin_api_key.encode(), f"{action}:{period}:{client_ip}".encode(), hashlib.sha256
+    ).hexdigest()
     expiry = datetime.fromtimestamp((period + 1) * period_seconds, timezone.utc)
     dialect = db.bind.dialect.name if db.bind is not None else ""
     if dialect == "postgresql":
@@ -42,4 +52,8 @@ def throttle_client(db: Session, request: Request, settings: Settings, *, action
     db.commit()
     if hits is None:
         retry = max(1, int(expiry.timestamp() - time.time()))
-        raise HTTPException(status_code=429, detail="Request rate limit reached", headers={"Retry-After": str(retry)})
+        raise HTTPException(
+            status_code=429,
+            detail="Request rate limit reached",
+            headers={"Retry-After": str(retry)},
+        )

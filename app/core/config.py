@@ -1,4 +1,5 @@
 """Validated PostgreSQL runtime configuration; no SQLite fallback."""
+
 from functools import lru_cache
 from typing import Literal
 from urllib.parse import urlparse
@@ -75,7 +76,11 @@ class Settings(BaseSettings):
         if parsed.scheme not in ("http", "https") or not parsed.netloc:
             raise ValueError("LLM_BASE_URL must be an HTTP(S) URL")
         if parsed.scheme == "http" and parsed.hostname not in {
-            "localhost", "127.0.0.1", "host.docker.internal", "ollama", "::1"
+            "localhost",
+            "127.0.0.1",
+            "host.docker.internal",
+            "ollama",
+            "::1",
         }:
             raise ValueError("Remote LLM endpoints must use HTTPS")
         return value.rstrip("/")

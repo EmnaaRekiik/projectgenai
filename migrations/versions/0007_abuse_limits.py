@@ -3,6 +3,7 @@
 Revision ID: 0007_abuse_limits
 Revises: 0006_candidate_accounts
 """
+
 import sqlalchemy as sa
 from alembic import op
 
@@ -13,11 +14,13 @@ depends_on = None
 
 
 def upgrade():
-    op.create_table("rate_limit_buckets",
+    op.create_table(
+        "rate_limit_buckets",
         sa.Column("key", sa.String(64), primary_key=True),
         sa.Column("hits", sa.Integer(), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
-        sa.CheckConstraint("hits >= 1", name="ck_rate_limit_hits_positive"))
+        sa.CheckConstraint("hits >= 1", name="ck_rate_limit_hits_positive"),
+    )
     op.create_index("ix_rate_limit_buckets_expires", "rate_limit_buckets", ["expires_at"])
 
 

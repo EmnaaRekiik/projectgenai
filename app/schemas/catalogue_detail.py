@@ -1,18 +1,25 @@
 """Typed contracts for programme specializations, courses, admission and tuition."""
+
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    field_validator,
+    model_validator,
+)
 
 
 class SourceFields(BaseModel):
     model_config = ConfigDict(extra="forbid")
     official_source_url: HttpUrl | None = Field(default=None, max_length=500)
     verified_at: datetime | None = None
-
-
 
 
 class PublicationStatus(str, Enum):
@@ -28,6 +35,7 @@ class PaymentMode(str, Enum):
 
 class _Validity(BaseModel):
     """Validity period: bounds are timezone-aware, stored in UTC; an empty bound means unlimited."""
+
     valid_from: AwareDatetime | None = None
     valid_to: AwareDatetime | None = None
 
@@ -38,7 +46,11 @@ class _Validity(BaseModel):
 
     @model_validator(mode="after")
     def end_after_start(self):
-        if self.valid_from is not None and self.valid_to is not None and self.valid_to <= self.valid_from:
+        if (
+            self.valid_from is not None
+            and self.valid_to is not None
+            and self.valid_to <= self.valid_from
+        ):
             raise ValueError("valid_to must be later than valid_from")
         return self
 
@@ -53,6 +65,7 @@ class PublishPatchFields(_Validity):
 
 class DetailPatch(SourceFields):
     """Patch fields handled with exclude_unset; use a separate serializer per kind."""
+
     pass
 
 
@@ -63,7 +76,9 @@ class SpecializationCreate(SourceFields):
 
 
 class SpecializationPatch(SourceFields):
-    code: str | None = Field(default=None, min_length=2, max_length=50, pattern=r"^[A-Z0-9][A-Z0-9_-]*$")
+    code: str | None = Field(
+        default=None, min_length=2, max_length=50, pattern=r"^[A-Z0-9][A-Z0-9_-]*$"
+    )
     title: str | None = Field(default=None, min_length=2, max_length=180)
     description: str | None = Field(default=None, max_length=5000)
 
@@ -79,7 +94,9 @@ class CourseCreate(SourceFields):
 
 class CoursePatch(SourceFields):
     specialization_id: uuid.UUID | None = None
-    code: str | None = Field(default=None, min_length=2, max_length=50, pattern=r"^[A-Z0-9][A-Z0-9_-]*$")
+    code: str | None = Field(
+        default=None, min_length=2, max_length=50, pattern=r"^[A-Z0-9][A-Z0-9_-]*$"
+    )
     title: str | None = Field(default=None, min_length=2, max_length=180)
     semester: int | None = Field(default=None, ge=1, le=20)
     credits: int | None = Field(default=None, ge=0, le=60)
@@ -187,7 +204,9 @@ class PaymentTermCreate(PublishCreateFields, SourceFields):
     academic_year: str = Field(pattern=r"^20\d{2}-20\d{2}$")
     payment_mode: PaymentMode
     installments_count: int | None = Field(default=None, ge=2, le=12)
-    first_payment_percent: Decimal | None = Field(default=None, gt=0, le=100, max_digits=5, decimal_places=2)
+    first_payment_percent: Decimal | None = Field(
+        default=None, gt=0, le=100, max_digits=5, decimal_places=2
+    )
     schedule_description: str | None = Field(default=None, max_length=5000)
     note: str | None = Field(default=None, max_length=5000)
 
@@ -207,7 +226,9 @@ class PaymentTermPatch(PublishPatchFields, SourceFields):
     academic_year: str | None = Field(default=None, pattern=r"^20\d{2}-20\d{2}$")
     payment_mode: PaymentMode | None = None
     installments_count: int | None = Field(default=None, ge=2, le=12)
-    first_payment_percent: Decimal | None = Field(default=None, gt=0, le=100, max_digits=5, decimal_places=2)
+    first_payment_percent: Decimal | None = Field(
+        default=None, gt=0, le=100, max_digits=5, decimal_places=2
+    )
     schedule_description: str | None = Field(default=None, max_length=5000)
     note: str | None = Field(default=None, max_length=5000)
 

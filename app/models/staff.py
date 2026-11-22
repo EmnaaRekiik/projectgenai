@@ -1,4 +1,5 @@
 """Persistent staff identity and revocable opaque access tokens."""
+
 import uuid
 from datetime import datetime
 from enum import Enum
@@ -42,8 +43,12 @@ class StaffUser(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     failed_login_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    sessions: Mapped[list["StaffSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    sessions: Mapped[list["StaffSession"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class StaffSession(Base):
@@ -55,7 +60,9 @@ class StaffSession(Base):
         ForeignKey("staff_users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     user: Mapped[StaffUser] = relationship(back_populates="sessions")

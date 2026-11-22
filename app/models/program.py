@@ -30,9 +30,7 @@ class Program(Base):
             "level IN ('LICENCE', 'PREPARATORY', 'ENGINEERING', 'OTHER')",
             name="ck_program_level",
         ),
-        CheckConstraint(
-            "status IN ('DRAFT', 'PUBLISHED', 'ARCHIVED')", name="ck_program_status"
-        ),
+        CheckConstraint("status IN ('DRAFT', 'PUBLISHED', 'ARCHIVED')", name="ck_program_status"),
         CheckConstraint(
             "status <> 'PUBLISHED' OR (official_source_url IS NOT NULL "
             "AND verified_at IS NOT NULL)",
@@ -62,4 +60,3 @@ class Program(Base):
     )
 
     institution: Mapped["Institution"] = relationship(back_populates="programs")
-

@@ -21,4 +21,3 @@ class Institution(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     programs: Mapped[list["Program"]] = relationship(back_populates="institution")
-

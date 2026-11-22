@@ -6,6 +6,7 @@ Usage:
 Read-only except for writing a triage.md report inside the selected run directory.
 No benchmark results or manual grades are changed.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -44,7 +45,9 @@ def load_run(folder: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
 def latest_run(root: Path = ROOT) -> Path:
     if not root.is_dir():
         raise ValueError(f"No results directory: {root}")
-    runs = sorted((p for p in root.iterdir() if p.is_dir() and (p / "results.jsonl").is_file()), reverse=True)
+    runs = sorted(
+        (p for p in root.iterdir() if p.is_dir() and (p / "results.jsonl").is_file()), reverse=True
+    )
     if not runs:
         raise ValueError(f"No evaluation runs found in {root}")
     return runs[0]
@@ -56,15 +59,14 @@ def _md_value(value: Any) -> str:
     return value.replace("|", "\\|").replace("`", "'")
 
 
-def make_report(rows: list[dict[str, Any]], summary: dict[str, Any],
-                folder: Path) -> str:
+def make_report(rows: list[dict[str, Any]], summary: dict[str, Any], folder: Path) -> str:
     counts = Counter(str(row.get("auto_status", "UNKNOWN")) for row in rows)
     completed = sum(counts[s] for s in ("PASS", "FAIL", "REVIEW"))
     recall = [row for row in rows if row.get("category") == "memory" and row.get("turn") == 2]
     scored_recall = [row for row in recall if row.get("auto_status") in {"PASS", "FAIL"}]
     passed_recall = sum(row.get("auto_status") == "PASS" for row in scored_recall)
     denominator = len(scored_recall)
-    pct = f"{passed_recall/denominator:.1%}" if denominator else "N/A"
+    pct = f"{passed_recall / denominator:.1%}" if denominator else "N/A"
     lines = [
         "# SmartCampus AI — Live evaluation triage",
         "",
@@ -88,48 +90,59 @@ def make_report(rows: list[dict[str, Any]], summary: dict[str, Any],
         lines.append("No automatic FAIL/ERROR/SKIPPED cases in this run.")
     for row in problems:
         status = row.get("auto_status", "UNKNOWN")
-        lines.extend([
-            f"### {_md_value(row.get('case_id', 'unknown'))} — {status}",
+        lines.extend(
+            [
+                f"### {_md_value(row.get('case_id', 'unknown'))} — {status}",
+                "",
+                f"Language / category: `{_md_value(row.get('language'))}` / `{_md_value(row.get('category'))}`",
+                "",
+                f"Prompt: {_md_value(row.get('prompt'))}",
+                "",
+                f"Expected behavior: {_md_value(row.get('expected_behavior'))}",
+                "",
+                f"Actual response: {_md_value(row.get('response')) or '(none returned)'}",
+                "",
+                f"Automatic failed checks: `{json.dumps(row.get('auto_checks_failed', []), ensure_ascii=False)}`",
+                "",
+                f"Recorded note: {_md_value(row.get('reviewer_notes')) or '(none)'}",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## Manual review priority (edit the ORIGINAL manual_review.csv)",
             "",
-            f"Language / category: `{_md_value(row.get('language'))}` / `{_md_value(row.get('category'))}`",
+            "First review completed responses in these categories:",
             "",
-            f"Prompt: {_md_value(row.get('prompt'))}",
-            "",
-            f"Expected behavior: {_md_value(row.get('expected_behavior'))}",
-            "",
-            f"Actual response: {_md_value(row.get('response')) or '(none returned)' }",
-            "",
-            f"Automatic failed checks: `{json.dumps(row.get('auto_checks_failed', []), ensure_ascii=False)}`",
-            "",
-            f"Recorded note: {_md_value(row.get('reviewer_notes')) or '(none)' }",
-            "",
-        ])
-    lines.extend([
-        "## Manual review priority (edit the ORIGINAL manual_review.csv)",
-        "",
-        "First review completed responses in these categories:",
-        "",
-    ])
+        ]
+    )
     for category in PRIORITY_CATEGORIES:
-        subset = [row for row in rows if row.get("category") == category and row.get("auto_status") not in {"ERROR", "SKIPPED"}]
+        subset = [
+            row
+            for row in rows
+            if row.get("category") == category
+            and row.get("auto_status") not in {"ERROR", "SKIPPED"}
+        ]
         lines.append(f"- {category}: {len(subset)} completed responses to assess")
-    lines.extend([
-        "",
-        "Suggested review sequence: memory recall failures, reliability questions, admission boundaries, other memory recalls, then welcome/intent/profiling/orientation.",
-        "",
-        "**Do not change the original `results.jsonl`, `summary.json` or dataset after seeing these results.**",
-        "Any focused rerun belongs to a new result folder and should be reported separately.",
-        "",
-        "## Commands (run from project root)",
-        "",
-        "```powershell",
-        "# Re-run only the original two-turn scenarios. No other cases are repeated.",
-        "python evaluation/run_eval.py --all --scenario MEM-06 --scenario MEM-10",
-        "# Grade the original full run after manually filling its CSV:",
-        f'python evaluation/score_reviews.py "evaluation/results/{folder.name}/manual_review.csv"',
-        "```",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "Suggested review sequence: memory recall failures, reliability questions, admission boundaries, other memory recalls, then welcome/intent/profiling/orientation.",
+            "",
+            "**Do not change the original `results.jsonl`, `summary.json` or dataset after seeing these results.**",
+            "Any focused rerun belongs to a new result folder and should be reported separately.",
+            "",
+            "## Commands (run from project root)",
+            "",
+            "```powershell",
+            "# Re-run only the original two-turn scenarios. No other cases are repeated.",
+            "python evaluation/run_eval.py --all --scenario MEM-06 --scenario MEM-10",
+            "# Grade the original full run after manually filling its CSV:",
+            f'python evaluation/score_reviews.py "evaluation/results/{folder.name}/manual_review.csv"',
+            "```",
+            "",
+        ]
+    )
     warnings = summary.get("cleanup_warnings") or []
     if warnings:
         lines.extend(["## Session cleanup warnings", ""])
@@ -139,8 +152,14 @@ def make_report(rows: list[dict[str, Any]], summary: dict[str, Any],
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Read-only inspection of a finished SA-32 evaluation")
-    parser.add_argument("--run", type=Path, help="Directory containing results.jsonl and summary.json; defaults to latest")
+    parser = argparse.ArgumentParser(
+        description="Read-only inspection of a finished SA-32 evaluation"
+    )
+    parser.add_argument(
+        "--run",
+        type=Path,
+        help="Directory containing results.jsonl and summary.json; defaults to latest",
+    )
     args = parser.parse_args(argv)
     try:
         folder = args.run if args.run else latest_run()

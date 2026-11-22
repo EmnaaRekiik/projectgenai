@@ -1,4 +1,5 @@
 """Opaque random bearer tokens; only their SHA-256 digests are persisted."""
+
 import hashlib
 import secrets
 

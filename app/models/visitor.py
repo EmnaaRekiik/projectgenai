@@ -3,6 +3,7 @@
 Session tokens are returned once and never written to the database in plaintext.
 The application does not record IP addresses or user agents in this module.
 """
+
 import uuid
 from datetime import datetime
 
@@ -20,6 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
 
 class VisitorSession(Base):
     __tablename__ = "visitor_sessions"
@@ -42,7 +44,9 @@ class VisitorSession(Base):
         DateTime(timezone=True), nullable=True
     )
     messages: Mapped[list["ConversationMessage"]] = relationship(
-        back_populates="session", cascade="all, delete-orphan", order_by="ConversationMessage.sequence"
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="ConversationMessage.sequence",
     )
 
 

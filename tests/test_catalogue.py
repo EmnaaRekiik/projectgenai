@@ -16,9 +16,12 @@ def test_openapi_exposes_staff_bearer_security(client):
 def test_staff_bearer_required_for_writes(client, institution):
     data = {"institution_id": institution["id"], "code": "X1", "title": "Demo", "level": "OTHER"}
     assert client.post("/api/v1/admin/programs", json=data).status_code == 401
-    assert client.post(
-        "/api/v1/admin/programs", json=data, headers={"Authorization": "Bearer wrong"}
-    ).status_code == 401
+    assert (
+        client.post(
+            "/api/v1/admin/programs", json=data, headers={"Authorization": "Bearer wrong"}
+        ).status_code
+        == 401
+    )
     assert client.get("/api/v1/admin/programs").status_code == 401
     assert client.get("/api/v1/programs").status_code == 200
 
@@ -44,9 +47,10 @@ def test_program_admin_listing_and_details(client, headers, draft):
     result = client.get("/api/v1/admin/programs", headers=headers).json()
     assert result["total"] == 1
     assert result["items"][0]["id"] == draft["id"]
-    assert client.get(
-        f"/api/v1/admin/programs/{draft['id']}", headers=headers
-    ).json()["status"] == "DRAFT"
+    assert (
+        client.get(f"/api/v1/admin/programs/{draft['id']}", headers=headers).json()["status"]
+        == "DRAFT"
+    )
 
 
 def test_dont_publish_without_source(client, headers, draft):
@@ -71,7 +75,9 @@ def test_publish_with_source_then_public_search(client, headers, draft, institut
         headers=headers,
     )
     assert result.status_code == 200, result.text
-    response = client.get("/api/v1/programs", params={"level": "LICENCE", "institution_id": institution["id"]})
+    response = client.get(
+        "/api/v1/programs", params={"level": "LICENCE", "institution_id": institution["id"]}
+    )
     assert response.status_code == 200
     assert response.json()["total"] == 1
     assert response.json()["items"][0]["title"] == draft["title"]
@@ -98,24 +104,36 @@ def test_duplicate_program_code_per_institution(client, headers, institution, dr
     duplicate = client.post(
         "/api/v1/admin/programs",
         json={
-            "institution_id": institution["id"], "code": "DEMO-LIC-1",
-            "title": "Different title", "level": "OTHER"
-        }, headers=headers,
+            "institution_id": institution["id"],
+            "code": "DEMO-LIC-1",
+            "title": "Different title",
+            "level": "OTHER",
+        },
+        headers=headers,
     )
     assert duplicate.status_code == 409
 
 
 def test_program_validation(client, headers, institution):
     base = {
-        "institution_id": institution["id"], "code": "INVALID1",
-        "title": "Example title", "level": "OTHER",
+        "institution_id": institution["id"],
+        "code": "INVALID1",
+        "title": "Example title",
+        "level": "OTHER",
     }
     for change in ({"duration_years": 11}, {"level": "NOT_A_LEVEL"}, {"code": "lowercase"}):
-        assert client.post("/api/v1/admin/programs", json=base | change, headers=headers).status_code == 422
-    assert client.post(
-        "/api/v1/admin/programs", json=base | {"institution_id": "00000000-0000-0000-0000-000000000000"},
-        headers=headers,
-    ).status_code == 404
+        assert (
+            client.post("/api/v1/admin/programs", json=base | change, headers=headers).status_code
+            == 422
+        )
+    assert (
+        client.post(
+            "/api/v1/admin/programs",
+            json=base | {"institution_id": "00000000-0000-0000-0000-000000000000"},
+            headers=headers,
+        ).status_code
+        == 404
+    )
 
 
 def test_archive_keeps_record_but_hides_publicly(client, headers, draft):
@@ -125,27 +143,37 @@ def test_archive_keeps_record_but_hides_publicly(client, headers, draft):
             "official_source_url": "https://example.edu/verified",
             "verified_at": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
             "status": "PUBLISHED",
-        }, headers=headers,
+        },
+        headers=headers,
     )
     assert published.status_code == 200, published.text
     assert client.get("/api/v1/programs").json()["total"] == 1
     response = client.delete(f"/api/v1/admin/programs/{draft['id']}", headers=headers)
     assert response.status_code == 204
     assert client.get("/api/v1/programs").json()["total"] == 0
-    assert client.get(f"/api/v1/admin/programs/{draft['id']}", headers=headers).json()["status"] == "ARCHIVED"
+    assert (
+        client.get(f"/api/v1/admin/programs/{draft['id']}", headers=headers).json()["status"]
+        == "ARCHIVED"
+    )
 
 
 def test_draft_patch_and_pagination(client, headers, institution, draft):
     updated = client.patch(
         f"/api/v1/admin/programs/{draft['id']}",
-        json={"title": "New title", "duration_years": 2}, headers=headers,
+        json={"title": "New title", "duration_years": 2},
+        headers=headers,
     )
     assert updated.status_code == 200, updated.text
     assert updated.json()["title"] == "New title"
     assert updated.json()["duration_years"] == 2
     second = client.post(
         "/api/v1/admin/programs",
-        json={"institution_id": institution["id"], "code": "SECOND", "title": "Another draft", "level": "OTHER"},
+        json={
+            "institution_id": institution["id"],
+            "code": "SECOND",
+            "title": "Another draft",
+            "level": "OTHER",
+        },
         headers=headers,
     )
     assert second.status_code == 201
@@ -157,7 +185,9 @@ def test_draft_patch_and_pagination(client, headers, institution, draft):
 def test_cannot_null_required_fields(client, headers, draft):
     for field in ("title", "status", "level"):
         res = client.patch(
-            f"/api/v1/admin/programs/{draft['id']}", json={field: None}, headers=headers,
+            f"/api/v1/admin/programs/{draft['id']}",
+            json={field: None},
+            headers=headers,
         )
         assert res.status_code == 422
 
@@ -174,12 +204,14 @@ def test_edit_published_program_without_reverifying_source(client, headers, draf
             "official_source_url": "https://example.edu/verified",
             "verified_at": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
             "status": "PUBLISHED",
-        }, headers=headers,
+        },
+        headers=headers,
     )
     assert res.status_code == 200
     res = client.patch(
         f"/api/v1/admin/programs/{draft['id']}",
-        json={"title": "Revised publication"}, headers=headers,
+        json={"title": "Revised publication"},
+        headers=headers,
     )
     assert res.status_code == 200, res.text
     assert client.get(f"/api/v1/programs/{draft['id']}").json()["title"] == "Revised publication"
@@ -192,15 +224,18 @@ def test_http_source_cannot_be_published(client, headers, draft):
             "official_source_url": "http://example.edu/doc",
             "verified_at": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
             "status": "PUBLISHED",
-        }, headers=headers,
+        },
+        headers=headers,
     )
     assert res.status_code == 422
 
 
 def test_reject_whitespace_titles_and_unknown_fields(client, headers, institution):
     payload = {
-        "institution_id": institution["id"], "code": "WHITESPACE",
-        "title": "   ", "level": "OTHER",
+        "institution_id": institution["id"],
+        "code": "WHITESPACE",
+        "title": "   ",
+        "level": "OTHER",
     }
     assert client.post("/api/v1/admin/programs", json=payload, headers=headers).status_code == 422
     payload["title"] = "A valid title"

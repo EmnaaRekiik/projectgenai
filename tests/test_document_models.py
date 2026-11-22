@@ -1,4 +1,5 @@
 """Rules of the document, version, chunk and indexing job tables (migration 0010)."""
+
 import hashlib
 from datetime import datetime, timedelta, timezone
 
@@ -34,9 +35,17 @@ def doc(db):
 
 
 def version(doc, n, content="a", current=False, **kw):
-    return DocumentVersion(document_id=doc.id, version_number=n, storage_path=f"docs/{n}.pdf",
-                           original_filename="b.pdf", mime_type="application/pdf", size_bytes=1234,
-                           sha256=sha(f"{content}{n}"), is_current=current, **kw)
+    return DocumentVersion(
+        document_id=doc.id,
+        version_number=n,
+        storage_path=f"docs/{n}.pdf",
+        original_filename="b.pdf",
+        mime_type="application/pdf",
+        size_bytes=1234,
+        sha256=sha(f"{content}{n}"),
+        is_current=current,
+        **kw,
+    )
 
 
 def _fails(db, obj):
@@ -54,8 +63,8 @@ def test_document_type_and_status_are_checked(db, doc):
 def test_versions_are_unique_and_only_one_is_current(db, doc):
     db.add(version(doc, 1, current=True))
     db.commit()
-    _fails(db, version(doc, 1))                       # same version number
-    _fails(db, version(doc, 2, current=True))         # second current version
+    _fails(db, version(doc, 1))  # same version number
+    _fails(db, version(doc, 2, current=True))  # second current version
     db.add(version(doc, 2, current=False))
     db.commit()
     # Same file uploaded twice for one document is detected by its checksum.
@@ -78,13 +87,38 @@ def test_chunks_are_ordered_and_embedding_state_is_consistent(db, doc):
     v = version(doc, 1, current=True)
     db.add(v)
     db.commit()
-    db.add(DocumentChunk(document_version_id=v.id, chunk_index=0, content="Texte", content_hash=sha("Texte")))
+    db.add(
+        DocumentChunk(
+            document_version_id=v.id, chunk_index=0, content="Texte", content_hash=sha("Texte")
+        )
+    )
     db.commit()
-    _fails(db, DocumentChunk(document_version_id=v.id, chunk_index=0, content="dup", content_hash=sha("dup")))
-    _fails(db, DocumentChunk(document_version_id=v.id, chunk_index=1, content="x", content_hash=sha("x"),
-                             embedded_at=NOW))  # embedded without naming the model
-    db.add(DocumentChunk(document_version_id=v.id, chunk_index=1, content="x", content_hash=sha("x"),
-                         embedding_model="test-model", embedded_at=NOW))
+    _fails(
+        db,
+        DocumentChunk(
+            document_version_id=v.id, chunk_index=0, content="dup", content_hash=sha("dup")
+        ),
+    )
+    _fails(
+        db,
+        DocumentChunk(
+            document_version_id=v.id,
+            chunk_index=1,
+            content="x",
+            content_hash=sha("x"),
+            embedded_at=NOW,
+        ),
+    )  # embedded without naming the model
+    db.add(
+        DocumentChunk(
+            document_version_id=v.id,
+            chunk_index=1,
+            content="x",
+            content_hash=sha("x"),
+            embedding_model="test-model",
+            embedded_at=NOW,
+        )
+    )
     db.commit()
 
 
@@ -95,18 +129,37 @@ def test_ingestion_job_rules(db, doc):
     db.add(IngestionJob(document_id=doc.id, document_version_id=v.id, action="ADD"))
     db.commit()
     # No second active job for the same version and action (idempotent upload).
-    _fails(db, IngestionJob(document_id=doc.id, document_version_id=v.id, action="ADD", status="RUNNING"))
+    _fails(
+        db,
+        IngestionJob(document_id=doc.id, document_version_id=v.id, action="ADD", status="RUNNING"),
+    )
     job = db.scalar(select(IngestionJob))
     job.status = "FAILED"
     job.error_message = "parser error"
     job.attempts = 1
     db.commit()
-    db.add(IngestionJob(document_id=doc.id, document_version_id=v.id, action="ADD"))  # retry is allowed
+    db.add(
+        IngestionJob(document_id=doc.id, document_version_id=v.id, action="ADD")
+    )  # retry is allowed
     db.commit()
-    _fails(db, IngestionJob(document_id=doc.id, document_version_id=v.id, action="UPDATE", status="FAILED"))
-    _fails(db, IngestionJob(document_id=doc.id, document_version_id=v.id, action="UPDATE", attempts=5, max_attempts=3))
+    _fails(
+        db,
+        IngestionJob(
+            document_id=doc.id, document_version_id=v.id, action="UPDATE", status="FAILED"
+        ),
+    )
+    _fails(
+        db,
+        IngestionJob(
+            document_id=doc.id,
+            document_version_id=v.id,
+            action="UPDATE",
+            attempts=5,
+            max_attempts=3,
+        ),
+    )
     _fails(db, IngestionJob(document_id=doc.id, action="ADD"))  # an active ADD must name a version
-    db.add(IngestionJob(document_id=doc.id, action="DELETE"))   # a DELETE may not
+    db.add(IngestionJob(document_id=doc.id, action="DELETE"))  # a DELETE may not
     db.commit()
 
 
@@ -114,8 +167,12 @@ def test_deleting_a_version_removes_its_chunks_but_keeps_job_history(db, doc):
     v = version(doc, 1, current=True)
     db.add(v)
     db.commit()
-    db.add(DocumentChunk(document_version_id=v.id, chunk_index=0, content="t", content_hash=sha("t")))
-    db.add(IngestionJob(document_id=doc.id, document_version_id=v.id, action="ADD", status="SUCCEEDED"))
+    db.add(
+        DocumentChunk(document_version_id=v.id, chunk_index=0, content="t", content_hash=sha("t"))
+    )
+    db.add(
+        IngestionJob(document_id=doc.id, document_version_id=v.id, action="ADD", status="SUCCEEDED")
+    )
     db.commit()
     db.delete(db.get(DocumentVersion, v.id))
     db.commit()

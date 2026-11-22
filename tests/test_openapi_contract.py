@@ -1,4 +1,5 @@
 """Detect accidental changes to the documented Swagger API contract."""
+
 import json
 from pathlib import Path
 
@@ -13,8 +14,15 @@ DECIMAL_PATTERN_PREFIX = "^(?!^[-+.]*$)"
 
 def without_decimal_patterns(node):
     if isinstance(node, dict):
-        return {key: without_decimal_patterns(value) for key, value in node.items()
-                if not (key == "pattern" and isinstance(value, str) and value.startswith(DECIMAL_PATTERN_PREFIX))}
+        return {
+            key: without_decimal_patterns(value)
+            for key, value in node.items()
+            if not (
+                key == "pattern"
+                and isinstance(value, str)
+                and value.startswith(DECIMAL_PATTERN_PREFIX)
+            )
+        }
     if isinstance(node, list):
         return [without_decimal_patterns(item) for item in node]
     return node

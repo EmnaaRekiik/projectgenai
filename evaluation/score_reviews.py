@@ -2,7 +2,9 @@
 
 Usage: python evaluation/score_reviews.py evaluation/results/<run>/manual_review.csv
 """
+
 from __future__ import annotations
+
 import argparse
 import csv
 import json
@@ -47,11 +49,15 @@ def aggregate(path: Path) -> dict:
         langs[row["language"]].append(row)
     for lang, subset in sorted(langs.items()):
         out["per_language"][lang] = {
-            dim: {"mean": grade([r[f"{dim}_score_0_to_3"] for r in subset], dim),
-                  "reviewed": sum(1 for r in subset if r[f"{dim}_score_0_to_3"].strip())}
+            dim: {
+                "mean": grade([r[f"{dim}_score_0_to_3"] for r in subset], dim),
+                "reviewed": sum(1 for r in subset if r[f"{dim}_score_0_to_3"].strip()),
+            }
             for dim in DIMENSIONS
         }
-    out["warning"] = "Human scores are subjective; report the number of reviewed answers and evaluator protocol."
+    out["warning"] = (
+        "Human scores are subjective; report the number of reviewed answers and evaluator protocol."
+    )
     return out
 
 
