@@ -36,11 +36,9 @@ def test_missing_bootstrap_key_disables_bootstrap_access(client, institution):
 
 def test_special_characters_in_db_password_are_preserved():
     cfg = Settings(
-        db_host="db",
-        db_user="demo",
-        db_password="p@ss:/#word",
-        db_name="smartcampus",
-        admin_api_key=None,
+        database_url=None,
+        db_host="db", db_user="demo", db_password="p@ss:/#word",
+        db_name="smartcampus", admin_api_key=None,
     )
     assert cfg.sqlalchemy_url.password == "p@ss:/#word"
     assert cfg.sqlalchemy_url.drivername == "postgresql+psycopg"
