@@ -114,7 +114,7 @@ def test_candidate_email_verification_with_smtp_mock(client, monkeypatch):
         smtp_host="smtp.test.local",
         smtp_from="noreply@example.org",
     )
-    user = make_account(client)
+    make_account(client)
     assert len(sent) == 1
     token = sent[0][1]
     assert len(token) > 32
