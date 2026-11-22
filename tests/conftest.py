@@ -19,6 +19,8 @@ from app.models import (
     ProgramSpecialization, ProgramCourse, ProgramAdmissionRule, ProgramTuition,
     CandidateUser, CandidateSession, CandidateEmailToken, RateLimitBucket,
     Appointment, EquivalenceRequest, InterviewResult, Preregistration,
+    AcademicProfile, CandidateConversation, CandidateMessage,
+    Document, DocumentChunk, DocumentVersion, IngestionJob,
 )
 from app.auth.tokens import digest_token
 from app.auth.passwords import hash_password
@@ -46,8 +48,10 @@ def test_engine():
         assert inspector.has_table("staff_sessions"), "Apply Alembic 0004 before testing"
         for name in ("program_specializations", "program_courses", "program_admission_rules", "program_tuition",
                      "candidate_users", "candidate_sessions", "candidate_email_tokens", "rate_limit_buckets",
-                     "preregistrations", "equivalence_requests", "appointments", "interview_results"):
-            assert inspector.has_table(name), f"Apply Alembic 0005-0008 before testing: missing {name}"
+                     "preregistrations", "equivalence_requests", "appointments", "interview_results",
+                     "academic_profiles", "candidate_conversations", "candidate_messages",
+                     "documents", "document_versions", "document_chunks", "ingestion_jobs"):
+            assert inspector.has_table(name), f"Apply Alembic 0005-0010 before testing: missing {name}"
     else:
         engine = create_engine(
             "sqlite+pysqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
@@ -65,6 +69,13 @@ def test_engine():
 @pytest.fixture
 def client(test_engine):
     with test_engine.begin() as conn:
+        conn.execute(delete(IngestionJob))
+        conn.execute(delete(DocumentChunk))
+        conn.execute(delete(DocumentVersion))
+        conn.execute(delete(Document))
+        conn.execute(delete(CandidateMessage))
+        conn.execute(delete(CandidateConversation))
+        conn.execute(delete(AcademicProfile))
         conn.execute(delete(InterviewResult))
         conn.execute(delete(Appointment))
         conn.execute(delete(EquivalenceRequest))

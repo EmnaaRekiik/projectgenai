@@ -10,3 +10,5 @@ from app.models.catalogue_detail import ProgramSpecialization, ProgramCourse, Pr
 from app.models.candidate import CandidateUser, CandidateSession, CandidateEmailToken
 from app.models.rate_limit import RateLimitBucket
 from app.models.admission import Appointment, EquivalenceRequest, InterviewResult, Preregistration
+from app.models.candidate_data import AcademicProfile, CandidateConversation, CandidateMessage
+from app.models.document import Document, DocumentChunk, DocumentVersion, IngestionJob

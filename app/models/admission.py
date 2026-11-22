@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
-    CheckConstraint, DateTime, ForeignKey, Index, Numeric, String, Text, UniqueConstraint, func,
+    CheckConstraint, text, DateTime, ForeignKey, Index, Numeric, String, Text, UniqueConstraint, func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -31,6 +31,9 @@ class Preregistration(Base):
         CheckConstraint("status = 'DRAFT' OR consent_given_at IS NOT NULL", name="ck_prereg_consent_required"),
         Index("ix_prereg_candidate", "candidate_id"),
         Index("ix_prereg_program_status", "program_id", "status"),
+        Index("uq_prereg_active_candidate_program", "candidate_id", "program_id", unique=True,
+              postgresql_where=text("status NOT IN ('REJECTED','CANCELLED')"),
+              sqlite_where=text("status NOT IN ('REJECTED','CANCELLED')")),
     )
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     candidate_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("candidate_users.id", ondelete="CASCADE"), nullable=False)

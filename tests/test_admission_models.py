@@ -45,13 +45,18 @@ def _commit_fails(db, obj):
 
 
 def test_preregistration_draft_needs_no_consent_but_submission_does(db, base):
-    ok = Preregistration(candidate_id=base["candidate"].id, program_id=base["program"].id, status="DRAFT")
-    db.add(ok)
+    draft = Preregistration(candidate_id=base["candidate"].id, program_id=base["program"].id, status="DRAFT")
+    db.add(draft)
     db.commit()
-    _commit_fails(db, Preregistration(candidate_id=base["candidate"].id, program_id=base["program"].id,
-                                      status="SUBMITTED"))
-    db.add(Preregistration(candidate_id=base["candidate"].id, program_id=base["program"].id,
-                           status="SUBMITTED", consent_given_at=NOW, submitted_at=NOW))
+    # Submitting without consent is refused by the database...
+    draft.status = "SUBMITTED"
+    with pytest.raises(IntegrityError):
+        db.commit()
+    db.rollback()
+    # ...and accepted once consent is recorded.
+    draft.status = "SUBMITTED"
+    draft.consent_given_at = NOW
+    draft.submitted_at = NOW
     db.commit()
 
 

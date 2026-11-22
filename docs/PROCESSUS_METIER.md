@@ -113,11 +113,62 @@ stateDiagram-v2
 - La décision (`ADMITTED`, `WAITLIST`, `REFUSED`, `INFO_NEEDED`) n'est autorisée que si le statut est `RESULT_RECORDED`.
 - Le score du QCM est compris entre 0 et 100.
 
-## 4. Enchaînement global
+## 4. Transitions : qui, quand, quelle notification
+
+« Candidat » = le candidat identifié. « Agent IA » = l'agent conversationnel, qui ne peut déclencher que les transitions marquées *IA possible* et seulement avec l'accord du candidat. Les e-mails dépendent de la configuration SMTP (voir README).
+
+### Préinscription
+
+| De → vers | Déclencheur | Condition | Notification |
+|---|---|---|---|
+| (création) → DRAFT | Candidat ou agent IA (IA possible) | Compte candidat existant ; une seule préinscription active par programme (index `uq_prereg_active_candidate_program`) | Aucune |
+| DRAFT → SUBMITTED | Candidat | Consentement enregistré (`consent_given_at`) | Accusé de réception au candidat ; alerte au responsable académique de l'institution |
+| SUBMITTED → COMPLETE | Responsable académique | Pièces et informations requises présentes | Candidat informé |
+| COMPLETE → VALIDATED | Responsable académique | **Décision humaine** | Candidat informé ; rendez-vous à proposer |
+| COMPLETE → REJECTED | Responsable académique | **Décision humaine**, motif dans `review_note` | Candidat informé |
+| DRAFT, SUBMITTED, COMPLETE → CANCELLED | Candidat | À tout moment avant la décision | Responsable informé |
+
+### Équivalence
+
+| De → vers | Déclencheur | Condition | Notification |
+|---|---|---|---|
+| DRAFT → SUBMITTED | Candidat | Diplôme et établissement d'origine renseignés | Accusé de réception ; alerte au responsable |
+| SUBMITTED → IN_REVIEW | Responsable académique | Prise en charge | Candidat informé |
+| IN_REVIEW → INFO_REQUESTED | Responsable académique | Liste du complément demandé | Candidat invité à compléter |
+| INFO_REQUESTED → IN_REVIEW | Candidat | Complément envoyé | Responsable informé |
+| IN_REVIEW → ACCEPTED / REFUSED | Responsable académique | **Décision humaine**, motif dans `decision_note` | Candidat informé |
+
+### Rendez-vous
+
+| De → vers | Déclencheur | Condition | Notification |
+|---|---|---|---|
+| (création) → PROPOSED | Responsable entretien ou agent IA (IA possible) | Préinscription au moins `COMPLETE` ; créneau libre, dans les règles autorisées | Invitation au candidat |
+| PROPOSED → CONFIRMED | Candidat | Acceptation | Confirmation aux deux parties ; rappel avant la date |
+| CONFIRMED → RESCHEDULED → CONFIRMED | Candidat ou responsable | Nouveau créneau accepté | Nouvelle invitation |
+| PROPOSED, CONFIRMED → CANCELLED | Candidat ou responsable | À tout moment avant la date | Autre partie informée |
+| CONFIRMED → COMPLETED | Responsable entretien | Rendez-vous tenu | Aucune |
+
+### Entretien
+
+| De → vers | Déclencheur | Condition | Notification |
+|---|---|---|---|
+| (création) → PLANNED | Système | Rendez-vous confirmé | Aucune |
+| PLANNED → QCM_SENT | Agent IA (IA possible) | QCM généré pour le parcours et le profil | Lien du QCM envoyé au candidat |
+| QCM_SENT → QCM_DONE | Candidat | QCM terminé et corrigé (`qcm_score` entre 0 et 100) | Synthèse prête pour le responsable |
+| QCM_DONE → HELD | Responsable entretien | Entretien réalisé | Aucune |
+| HELD → RESULT_RECORDED | Responsable entretien | **Décision humaine** (`ADMITTED`, `WAITLIST`, `REFUSED`, `INFO_NEEDED`) + observations | Candidat informé selon la décision |
+
+### Règles transversales
+- **Consentement** : aucune donnée ne passe de visiteur à candidat sans accord explicite (conversation, profil) ; la préinscription exige un consentement horodaté.
+- **Décisions officielles** : validation de préinscription, équivalence et résultat d'entretien sont toujours humains.
+- **Relances** : un dossier inactif déclenche une relance personnalisée, tracée ; au-delà d'un seuil défini par la direction, il est confié à un conseiller humain.
+- **Suppression** : la suppression du compte candidat supprime ses demandes, son profil et ses conversations (clés étrangères en cascade).
+
+## 5. Enchaînement global
 
 ```mermaid
 flowchart LR
-    V[Visiteur] -->|crée un compte| C[Candidat]
+    V[Visiteur] -->|crée un compte, consent| C[Candidat]
     C --> E[Équivalence si besoin]
     C --> P[Préinscription]
     P -->|COMPLETE puis VALIDATED| R[Rendez-vous]
@@ -125,7 +176,13 @@ flowchart LR
     I -->|décision humaine| D[Résultat enregistré]
 ```
 
-## 5. Points à décider avec la Personne B
+## 6. Décisions prises (avec justification)
 
-1. **Propriété d'une conversation (T9).** Aujourd'hui `conversation_messages` référence `visitor_sessions` avec suppression en cascade : à l'expiration de la session (24 h), les messages sont purgés. Pour qu'un candidat garde sa conversation, il faut soit déplacer les messages vers un propriétaire candidat, soit ajouter une table `conversations` possédée par un candidat. La migration 0008 **ne modifie pas** ces tables existantes ; le choix doit être fait avec la Personne B avant la migration 0009/0010 correspondante.
-2. **pgvector (T5)** : image `pgvector/pgvector:pg16` à tester sur une base neuve avant d'y toucher.
+| Sujet | Décision | Pourquoi |
+|---|---|---|
+| Conversation d'un visiteur qui crée un compte (T4 / T9) | Nouvelles tables `candidate_conversations` et `candidate_messages`. Au rattachement (T9), les messages de la session visiteur y sont **copiés** dans une transaction. Les tables visiteur ne sont pas modifiées. | Le chat qui fonctionne et ses tests restent intacts ; les données visiteur continuent d'expirer sauf accord explicite ; `source_visitor_session_id` unique empêche de rattacher deux fois la même session. |
+| pgvector (T5) | Pas de changement d'image Docker maintenant. Les tables de documents, versions, chunks et jobs n'en dépendent pas ; la colonne vectorielle viendra dans une migration ultérieure, une fois le modèle d'embedding choisi (T10). | La dimension du vecteur dépend du modèle ; changer l'image Postgres sur une base existante est risqué ; les tests et la migration restent exécutables partout. |
+| Version courante d'un document | Colonne `is_current` avec index unique partiel, sans clé étrangère circulaire. | Simple, vérifié par la base elle-même. |
+| Fichier envoyé deux fois | Rejeté via `sha256` unique par document. | Évite les doublons de versions. |
+| Jobs d'indexation | Index unique partiel : un seul job actif par version et action. Bail (`locked_until`) pour reprendre un job interrompu. | Rend l'import idempotent et robuste aux pannes du worker. |
+| Plusieurs préinscriptions pour un même programme | Une seule active (`SUBMITTED`, `COMPLETE`, `VALIDATED`, `DRAFT`) ; une annulée ou rejetée n'empêche pas de recommencer. | Évite les doublons sans bloquer une nouvelle candidature. |
