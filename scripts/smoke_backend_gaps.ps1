@@ -7,8 +7,8 @@ $base = 'http://127.0.0.1:8001/api/v1'
 
 Write-Host '[1/5] Migration and service status' -ForegroundColor Cyan
 $revision = (docker compose exec -T api python -m alembic current | Out-String)
-if ($LASTEXITCODE -ne 0 -or $revision -notmatch '0007_abuse_limits\s+\(head\)') {
-    throw "Expected 0007_abuse_limits (head). Actual: $revision"
+if ($LASTEXITCODE -ne 0 -or $revision -notmatch '\(head\)') {
+    throw "Database is not at the Alembic head. Actual: $revision"
 }
 $services = @(docker compose ps --services --status running)
 foreach ($name in @('db', 'api', 'retention')) {
@@ -18,7 +18,7 @@ $health = Invoke-RestMethod -Method Get -Uri "$base/health/ready"
 if ($health.status -ne 'ready' -or $health.schema -ne 'catalogue-v2') {
     throw 'Readiness endpoint did not confirm the new schema.'
 }
-Write-Host 'PASS: all three services running, catalogue-v2 ready, Alembic 0007 head.' -ForegroundColor Green
+Write-Host 'PASS: all three services running, catalogue-v2 ready, Alembic at head.' -ForegroundColor Green
 
 Write-Host '[2/5] Swagger API contracts' -ForegroundColor Cyan
 $api = Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8001/openapi.json'
