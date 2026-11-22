@@ -78,3 +78,26 @@ erDiagram
 
 ### Ajouter les vecteurs plus tard
 Quand le modèle d'embedding sera choisi (T10), une migration ajoutera, par exemple, une table `chunk_embeddings (chunk_id, embedding vector(N))` avec l'extension pgvector. `document_chunks.embedding_model` et `embedded_at` indiquent déjà quels chunks sont indexés et avec quel modèle. Ce changement nécessitera l'image `pgvector/pgvector:pg16` : à tester sur une base neuve.
+
+## T6 — Données de démonstration (fictives)
+
+Commande (après `bootstrap_admin.ps1` et `docker compose up -d --build`) :
+
+```powershell
+.\scripts\seed_demo.ps1            # brouillons invisibles + 5 comptes responsables de démo
+.\scripts\seed_demo.ps1 -Publish   # expose les données au public (DÉVELOPPEMENT UNIQUEMENT)
+.\scripts\seed_demo.ps1 -Remove    # supprime tout ce que le script a créé
+```
+
+Contenu : 5 formations fictives (`DEMO-IIT-LIC-INFO`, `DEMO-IIT-PREPA`, `DEMO-IIT-ING-INFO`, `DEMO-ISB-LIC`,
+`DEMO-ISB-SPEC`) avec spécialités, matières, 3 règles d'admission, frais annuels (+ un tarif de l'année
+précédente expiré pour illustrer le filtre de validité) et 2 modalités de paiement.
+
+Règles :
+- Titres préfixés `[DÉMO]`, codes `DEMO-…`, montants fictifs : aucune donnée officielle IIT/ISB n'est inventée.
+- Idempotent : relancer ne duplique rien. Les périodes de validité couvrent l'année universitaire courante (1er sept. → 31 août).
+- Par défaut tout est en brouillon. `-Publish` ajoute la source réservée `https://demo.invalid/donnees-fictives`.
+- Comptes `demo.admin|iit|isb|entretien|direction@example.org` : mots de passe aléatoires affichés **une seule fois**
+  (ou la valeur de `DEMO_STAFF_PASSWORD`, 12–128 caractères). Le script refuse de créer des comptes tant que
+  l'administrateur réel n'existe pas (il bloquerait sinon le bootstrap).
+- Supprimer les comptes de démo avant toute mise en production (`-Remove`).
