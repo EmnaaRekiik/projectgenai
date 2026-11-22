@@ -34,18 +34,15 @@ def test_missing_bootstrap_key_disables_bootstrap_access(client, institution):
     assert result.status_code == 503
 
 
-def test_special_characters_in_db_password_are_preserved(monkeypatch):
-    for key in ("DATABASE_URL", "DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME"):
-        monkeypatch.delenv(key, raising=False)
-
+def test_special_characters_in_db_password_are_preserved():
     cfg = Settings(
+        database_url=None,
         db_host="db",
         db_user="demo",
         db_password="p@ss:/#word",
         db_name="smartcampus",
         admin_api_key=None,
     )
-
     assert cfg.sqlalchemy_url.password == "p@ss:/#word"
     assert cfg.sqlalchemy_url.drivername == "postgresql+psycopg"
 

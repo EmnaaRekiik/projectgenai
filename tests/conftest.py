@@ -19,14 +19,26 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.models import (
+    AcademicProfile,
+    Appointment,
+    CandidateConversation,
     CandidateEmailToken,
+    CandidateMessage,
     CandidateSession,
     CandidateUser,
     ConversationMessage,
+    Document,
+    DocumentChunk,
+    DocumentVersion,
+    EquivalenceRequest,
+    IngestionJob,
     Institution,
+    InterviewResult,
+    Preregistration,
     Program,
     ProgramAdmissionRule,
     ProgramCourse,
+    ProgramPaymentTerm,
     ProgramSpecialization,
     ProgramTuition,
     RateLimitBucket,
@@ -67,13 +79,25 @@ def test_engine():
             "program_courses",
             "program_admission_rules",
             "program_tuition",
+            "program_payment_terms",
             "candidate_users",
             "candidate_sessions",
             "candidate_email_tokens",
             "rate_limit_buckets",
+            "preregistrations",
+            "equivalence_requests",
+            "appointments",
+            "interview_results",
+            "academic_profiles",
+            "candidate_conversations",
+            "candidate_messages",
+            "documents",
+            "document_versions",
+            "document_chunks",
+            "ingestion_jobs",
         ):
             assert inspector.has_table(name), (
-                f"Apply Alembic 0005-0007 before testing: missing {name}"
+                f"Apply Alembic 0005-0011 before testing: missing {name}"
             )
     else:
         engine = create_engine(
@@ -94,6 +118,17 @@ def test_engine():
 @pytest.fixture
 def client(test_engine):
     with test_engine.begin() as conn:
+        conn.execute(delete(IngestionJob))
+        conn.execute(delete(DocumentChunk))
+        conn.execute(delete(DocumentVersion))
+        conn.execute(delete(Document))
+        conn.execute(delete(CandidateMessage))
+        conn.execute(delete(CandidateConversation))
+        conn.execute(delete(AcademicProfile))
+        conn.execute(delete(InterviewResult))
+        conn.execute(delete(Appointment))
+        conn.execute(delete(EquivalenceRequest))
+        conn.execute(delete(Preregistration))
         conn.execute(delete(CandidateEmailToken))
         conn.execute(delete(CandidateSession))
         conn.execute(delete(CandidateUser))
@@ -102,6 +137,7 @@ def client(test_engine):
         conn.execute(delete(ProgramSpecialization))
         conn.execute(delete(ProgramAdmissionRule))
         conn.execute(delete(ProgramTuition))
+        conn.execute(delete(ProgramPaymentTerm))
         conn.execute(delete(StaffSession))
         conn.execute(delete(StaffUser))
         conn.execute(delete(ConversationMessage))

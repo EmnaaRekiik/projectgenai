@@ -115,3 +115,61 @@ La vérification d'email est entièrement implémentée, mais son **envoi réel 
 ## Fichiers candidats — contrat de phase ultérieure, pas une API livrée
 
 Les documents candidat (pièce d'identité, diplôme, relevé) exigeront du stockage binaire, des consentements, antivirus, politiques d'accès, liens temporaires et quotas. **Aucun endpoint de dépôt de fichier n'est implémenté en 0.5.0** ; le futur contrat est `POST /api/v1/candidates/me/documents` (upload), `GET /api/v1/candidates/me/documents` (liste), `DELETE /api/v1/candidates/me/documents/{id}` (retrait) et consultation staff filtrée par rôle. Ce choix évite de simuler un stockage de fichiers à l'aide de métadonnées fictives. L'implémentation appartient à une phase de dossiers/préinscription distincte.
+
+---
+
+# Extension T7 — modalités de paiement, statut de publication et période de validité (migration 0011)
+
+## Nouvelle ressource : modalités de paiement
+
+Même schéma d'accès que les tarifs et les conditions d'admission.
+
+| Type | Public (lecture) | Staff (lecture, création, modification, suppression) |
+|---|---|---|
+| Modalités de paiement | `GET /api/v1/programs/P/payment-terms` | `GET/POST /api/v1/admin/programs/P/payment-terms`, `PATCH/DELETE /api/v1/admin/programs/P/payment-terms/{item_id}` |
+
+Champs : `label`, `academic_year` (`2026-2027`, deux années consécutives), `payment_mode` (`FULL` ou `INSTALLMENTS`), `installments_count` (2 à 12, **obligatoire** pour `INSTALLMENTS`, **interdit** pour `FULL`), `first_payment_percent` (supérieur à 0 et au plus 100), `schedule_description`, `note`, plus les champs de source et de publication ci-dessous. Un même `label` est unique par programme et par année (409 sinon).
+
+## Statut de publication et validité (tarifs, modalités de paiement, conditions d'admission)
+
+| Champ | Valeurs | Remarque |
+|---|---|---|
+| `publication_status` | `DRAFT`, `PUBLISHED`, `ARCHIVED` | Défaut `PUBLISHED` : le comportement existant est conservé, la vérification de la source reste obligatoire. `DRAFT` et `ARCHIVED` masquent l'élément au public sans effacer sa vérification. |
+| `valid_from` | date-heure **avec fuseau horaire**, ou `null` | Début de validité. Converti en UTC. Une date sans fuseau est refusée (422). |
+| `valid_to` | idem | Fin de validité. Doit être strictement postérieure à `valid_from` (422 sinon, y compris lors d'un PATCH comparé aux valeurs déjà enregistrées). Une borne vide signifie « sans limite ». |
+
+### Ce que voient les candidats et l'agent IA
+
+Un élément est visible par les routes publiques **si et seulement si** :
+1. le programme est `PUBLISHED` ;
+2. l'élément a une source HTTPS et une date de vérification non future ;
+3. `publication_status = PUBLISHED` ;
+4. la date du jour est comprise dans `[valid_from, valid_to]` (bornes vides = illimité).
+
+Les routes administrateur montrent toujours tout, quelle que soit la période. L'agent IA doit appeler les routes publiques, ou la fonction `official_and_valid_now(model)` de `app/api/routers/catalogue_details.py`, pour ne jamais lire un brouillon, un élément archivé ou une période expirée.
+
+### Vérification après modification
+- Modifier le **contenu** (libellé, montant, mode de paiement, nombre d'échéances, description, etc.) ou les **dates de validité** retire `verified_at` : l'élément redevient privé jusqu'à une nouvelle vérification.
+- Modifier seulement `publication_status` ne retire **pas** la vérification (c'est une action de gestion).
+
+### Codes d'erreur
+`401` sans jeton staff ; `403` rôle non autorisé ; `404` programme absent, brouillon sur route publique, ou autre institution ; `409` libellé déjà utilisé pour l'année ; `422` valeurs invalides (mode et échéances incohérents, période inversée, fuseau manquant, année non consécutive, `publication_status` nul).
+
+## Exemple
+
+```json
+POST /api/v1/admin/programs/{P}/payment-terms
+{
+  "label": "Paiement en trois tranches",
+  "academic_year": "2026-2027",
+  "payment_mode": "INSTALLMENTS",
+  "installments_count": 3,
+  "first_payment_percent": "40.00",
+  "schedule_description": "40 % à l'inscription, 30 % en décembre, 30 % en mars",
+  "valid_from": "2026-09-01T00:00:00+01:00",
+  "valid_to": "2027-08-31T23:59:59+01:00",
+  "official_source_url": "https://exemple.tn/source-officielle",
+  "verified_at": "2026-11-20T10:00:00+01:00"
+}
+```
+(L'URL ci-dessus est un exemple de format, pas une source officielle.)

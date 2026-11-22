@@ -8,7 +8,6 @@ from sqlalchemy.pool import StaticPool
 from app.db import session as db_session
 from app.db.base import Base
 from app.main import app
-from app.models import Institution, Program  # noqa: F401
 
 
 def test_health_ready_uses_a_real_db_session(monkeypatch):

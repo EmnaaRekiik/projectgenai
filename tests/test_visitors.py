@@ -196,7 +196,7 @@ def test_retention_job_purges_expired_messages(client, test_engine, monkeypatch)
 
     # Mimic PostgreSQL's ON DELETE CASCADE in the SQLite-only fast-test double.
     with test_engine.connect() as conn:
-        if conn.dialect.name == "sqlite":
+        if test_engine.dialect.name == "sqlite":
             conn.exec_driver_sql("PRAGMA foreign_keys=ON")
     created = new_session(client)
     assert add(client, created, "temporary context").status_code == 201
