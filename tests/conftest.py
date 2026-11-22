@@ -16,7 +16,7 @@ from app.db.session import get_db
 from app.main import app
 from app.models import (
     ConversationMessage, Institution, Program, VisitorSession, StaffUser, StaffSession, StaffRole,
-    ProgramSpecialization, ProgramCourse, ProgramAdmissionRule, ProgramTuition,
+    ProgramSpecialization, ProgramCourse, ProgramAdmissionRule, ProgramTuition, ProgramPaymentTerm,
     CandidateUser, CandidateSession, CandidateEmailToken, RateLimitBucket,
     Appointment, EquivalenceRequest, InterviewResult, Preregistration,
     AcademicProfile, CandidateConversation, CandidateMessage,
@@ -46,12 +46,12 @@ def test_engine():
         assert "chat_request_id" in [c["name"] for c in inspector.get_columns("visitor_sessions")], "Apply Alembic 0003 before testing"
         assert inspector.has_table("staff_users"), "Apply Alembic 0004 before testing"
         assert inspector.has_table("staff_sessions"), "Apply Alembic 0004 before testing"
-        for name in ("program_specializations", "program_courses", "program_admission_rules", "program_tuition",
+        for name in ("program_specializations", "program_courses", "program_admission_rules", "program_tuition", "program_payment_terms",
                      "candidate_users", "candidate_sessions", "candidate_email_tokens", "rate_limit_buckets",
                      "preregistrations", "equivalence_requests", "appointments", "interview_results",
                      "academic_profiles", "candidate_conversations", "candidate_messages",
                      "documents", "document_versions", "document_chunks", "ingestion_jobs"):
-            assert inspector.has_table(name), f"Apply Alembic 0005-0010 before testing: missing {name}"
+            assert inspector.has_table(name), f"Apply Alembic 0005-0011 before testing: missing {name}"
     else:
         engine = create_engine(
             "sqlite+pysqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
@@ -88,6 +88,7 @@ def client(test_engine):
         conn.execute(delete(ProgramSpecialization))
         conn.execute(delete(ProgramAdmissionRule))
         conn.execute(delete(ProgramTuition))
+        conn.execute(delete(ProgramPaymentTerm))
         conn.execute(delete(StaffSession))
         conn.execute(delete(StaffUser))
         conn.execute(delete(ConversationMessage))

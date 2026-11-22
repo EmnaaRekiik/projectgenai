@@ -8,7 +8,7 @@ Migrations additives, à la suite de `0007_abuse_limits` : aucune table existant
 | `0009_profile_conversations` | `academic_profiles`, `candidate_conversations`, `candidate_messages`, index « une préinscription active par programme » | T4 |
 | `0010_documents_ingestion` | `documents`, `document_versions`, `document_chunks`, `ingestion_jobs` | T5 |
 
-La prochaine migration (T7, paiement et validité des tarifs) sera `0011`.
+Migration suivante : `0011_payment_terms_validity` (T7, voir `docs/API_CONTRACT.md`).
 
 ## Les trois profils dans la base
 
