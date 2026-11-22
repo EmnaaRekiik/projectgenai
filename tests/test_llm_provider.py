@@ -19,7 +19,11 @@ def setting(**kwargs):
 
 def patched_client(monkeypatch, callback):
     original_client = httpx.Client
-    monkeypatch.setattr(provider.httpx, "Client", lambda **kw: original_client(transport=httpx.MockTransport(callback), **kw))
+    monkeypatch.setattr(
+        provider.httpx,
+        "Client",
+        lambda **kw: original_client(transport=httpx.MockTransport(callback), **kw),
+    )
 
 
 def test_provider_sends_real_openai_compatible_request(monkeypatch):
@@ -27,12 +31,18 @@ def test_provider_sends_real_openai_compatible_request(monkeypatch):
         assert str(request.url) == "https://llm.example.test/v1/chat/completions"
         assert request.headers["Authorization"] == "Bearer some-key"
         import json
+
         payload = json.loads(request.content)
         assert payload["model"] == "example-model"
         assert payload["messages"][-1] == {"role": "user", "content": "salem"}
-        return httpx.Response(200, json={"choices": [{"message": {"content": " Ahla! "}}], "model": "example-model"})
+        return httpx.Response(
+            200, json={"choices": [{"message": {"content": " Ahla! "}}], "model": "example-model"}
+        )
+
     patched_client(monkeypatch, respond)
-    result = OpenAICompatibleClient().generate([ChatMessage(role="user", content="salem")], setting())
+    result = OpenAICompatibleClient().generate(
+        [ChatMessage(role="user", content="salem")], setting()
+    )
     assert result.content == "Ahla!"
 
 
@@ -51,7 +61,10 @@ def test_provider_rejects_malformed_success(monkeypatch):
 
 def test_llm_url_blocks_remote_cleartext_http():
     with pytest.raises(ValueError):
-        Settings(database_url="postgresql+psycopg://a:b@localhost/db", llm_base_url="http://llm.example.test/v1")
+        Settings(
+            database_url="postgresql+psycopg://a:b@localhost/db",
+            llm_base_url="http://llm.example.test/v1",
+        )
 
 
 def test_system_prompt_requires_verified_sources():
@@ -60,6 +73,7 @@ def test_system_prompt_requires_verified_sources():
 
 def test_native_ollama_disables_thinking_and_returns_only_content(monkeypatch):
     import json
+
     from app.llm.provider import ChatMessage
 
     def respond(request):
@@ -70,10 +84,17 @@ def test_native_ollama_disables_thinking_and_returns_only_content(monkeypatch):
         assert payload["think"] is False
         assert payload["options"]["num_predict"] == 256
         assert payload["messages"][-1]["content"] == "salem"
-        return httpx.Response(200, json={
-            "model": "qwen3.5:4b",
-            "message": {"role": "assistant", "thinking": "private reasoning", "content": "Marhba!"},
-        })
+        return httpx.Response(
+            200,
+            json={
+                "model": "qwen3.5:4b",
+                "message": {
+                    "role": "assistant",
+                    "thinking": "private reasoning",
+                    "content": "Marhba!",
+                },
+            },
+        )
 
     patched_client(monkeypatch, respond)
     cfg = Settings(
@@ -91,12 +112,18 @@ def test_native_ollama_disables_thinking_and_returns_only_content(monkeypatch):
 
 def test_native_ollama_rejects_empty_content_even_with_thinking(monkeypatch):
     from app.llm.provider import ChatMessage
-    patched_client(monkeypatch, lambda r: httpx.Response(200, json={
-        "model": "qwen3.5:4b", "message": {"content": "", "thinking": "only thinking"}
-    }))
+
+    patched_client(
+        monkeypatch,
+        lambda r: httpx.Response(
+            200,
+            json={"model": "qwen3.5:4b", "message": {"content": "", "thinking": "only thinking"}},
+        ),
+    )
     cfg = Settings(
         database_url="postgresql+psycopg://a:b@localhost/db",
-        llm_provider="ollama", llm_base_url="http://host.docker.internal:11434/v1",
+        llm_provider="ollama",
+        llm_base_url="http://host.docker.internal:11434/v1",
         llm_model="qwen3.5:4b",
     )
     with pytest.raises(LLMUpstreamError, match="empty response"):
@@ -105,6 +132,7 @@ def test_native_ollama_rejects_empty_content_even_with_thinking(monkeypatch):
 
 def test_extended_timeout_is_validated():
     from pydantic import ValidationError
+
     assert setting(llm_timeout_seconds=240).llm_timeout_seconds == 240
     with pytest.raises(ValidationError):
         setting(llm_timeout_seconds=301)

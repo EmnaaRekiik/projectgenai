@@ -7,7 +7,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.security import (
-    StaffIdentity, require_catalogue_reader, require_catalogue_editor, require_same_institution
+    StaffIdentity,
+    require_catalogue_editor,
+    require_catalogue_reader,
+    require_same_institution,
 )
 from app.db.session import get_db
 from app.models import Institution, Program
@@ -15,7 +18,8 @@ from app.schemas.program import Level, Page, ProgramCreate, ProgramOut, ProgramP
 
 router = APIRouter(prefix="/programs", tags=["Programmes publics"])
 admin_router = APIRouter(
-    prefix="/admin/programs", tags=["Administration des programmes"],
+    prefix="/admin/programs",
+    tags=["Administration des programmes"],
     dependencies=[Depends(require_catalogue_reader)],
 )
 
@@ -30,7 +34,9 @@ def _program_or_404(db: Session, program_id: uuid.UUID) -> Program:
 def _paginate(db: Session, statement, limit: int, offset: int) -> Page[ProgramOut]:
     count_stmt = select(func.count()).select_from(statement.order_by(None).subquery())
     total = db.scalar(count_stmt) or 0
-    items = list(db.scalars(statement.order_by(Program.title, Program.id).limit(limit).offset(offset)))
+    items = list(
+        db.scalars(statement.order_by(Program.title, Program.id).limit(limit).offset(offset))
+    )
     return Page[ProgramOut](
         items=[ProgramOut.model_validate(item) for item in items],
         total=total,
@@ -54,11 +60,13 @@ def list_public_programs(
     if level is not None:
         stmt = stmt.where(Program.level == level.value)
     if q is not None:
-        stmt = stmt.where(or_(
-            Program.title.icontains(q, autoescape=True),
-            Program.code.icontains(q, autoescape=True),
-            Program.description.icontains(q, autoescape=True),
-        ))
+        stmt = stmt.where(
+            or_(
+                Program.title.icontains(q, autoescape=True),
+                Program.code.icontains(q, autoescape=True),
+                Program.description.icontains(q, autoescape=True),
+            )
+        )
     return _paginate(db, stmt, limit, offset)
 
 
@@ -70,7 +78,9 @@ def get_public_program(program_id: uuid.UUID, db: Session = Depends(get_db)) -> 
     return program
 
 
-@admin_router.get("", response_model=Page[ProgramOut], summary="List drafts and published programmes")
+@admin_router.get(
+    "", response_model=Page[ProgramOut], summary="List drafts and published programmes"
+)
 def list_admin_programs(
     status_filter: ProgramStatus | None = Query(default=None, alias="status"),
     institution_id: uuid.UUID | None = None,
@@ -91,17 +101,20 @@ def list_admin_programs(
     if level is not None:
         stmt = stmt.where(Program.level == level.value)
     if q is not None:
-        stmt = stmt.where(or_(
-            Program.title.icontains(q, autoescape=True),
-            Program.code.icontains(q, autoescape=True),
-            Program.description.icontains(q, autoescape=True),
-        ))
+        stmt = stmt.where(
+            or_(
+                Program.title.icontains(q, autoescape=True),
+                Program.code.icontains(q, autoescape=True),
+                Program.description.icontains(q, autoescape=True),
+            )
+        )
     return _paginate(db, stmt, limit, offset)
 
 
 @admin_router.get("/{program_id}", response_model=ProgramOut, summary="Read any programme")
 def get_admin_program(
-    program_id: uuid.UUID, db: Session = Depends(get_db),
+    program_id: uuid.UUID,
+    db: Session = Depends(get_db),
     identity: StaffIdentity = Depends(require_catalogue_reader),
 ) -> Program:
     program = _program_or_404(db, program_id)
@@ -110,11 +123,14 @@ def get_admin_program(
 
 
 @admin_router.post(
-    "", response_model=ProgramOut, status_code=status.HTTP_201_CREATED,
+    "",
+    response_model=ProgramOut,
+    status_code=status.HTTP_201_CREATED,
     summary="Create a programme as a draft",
 )
 def create_program(
-    payload: ProgramCreate, db: Session = Depends(get_db),
+    payload: ProgramCreate,
+    db: Session = Depends(get_db),
     identity: StaffIdentity = Depends(require_catalogue_editor),
 ) -> Program:
     require_same_institution(identity, payload.institution_id)
@@ -139,9 +155,13 @@ def create_program(
     return program
 
 
-@admin_router.patch("/{program_id}", response_model=ProgramOut, summary="Update or publish a programme")
+@admin_router.patch(
+    "/{program_id}", response_model=ProgramOut, summary="Update or publish a programme"
+)
 def patch_program(
-    program_id: uuid.UUID, payload: ProgramPatch, db: Session = Depends(get_db),
+    program_id: uuid.UUID,
+    payload: ProgramPatch,
+    db: Session = Depends(get_db),
     identity: StaffIdentity = Depends(require_catalogue_editor),
 ) -> Program:
     program = _program_or_404(db, program_id)
@@ -170,23 +190,28 @@ def patch_program(
             verified_at.tzinfo is None or verified_at > datetime.now(timezone.utc)
         ):
             raise HTTPException(
-                status_code=422, detail="Verification timestamp must be timezone-aware and in the past"
+                status_code=422,
+                detail="Verification timestamp must be timezone-aware and in the past",
             )
     try:
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Programme update conflicts with a constraint") from exc
+        raise HTTPException(
+            status_code=409, detail="Programme update conflicts with a constraint"
+        ) from exc
     db.refresh(program)
     return program
 
 
 @admin_router.delete(
-    "/{program_id}", status_code=status.HTTP_204_NO_CONTENT,
+    "/{program_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
     summary="Archive a programme without destroying references",
 )
 def archive_program(
-    program_id: uuid.UUID, db: Session = Depends(get_db),
+    program_id: uuid.UUID,
+    db: Session = Depends(get_db),
     identity: StaffIdentity = Depends(require_catalogue_editor),
 ) -> Response:
     program = _program_or_404(db, program_id)

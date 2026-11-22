@@ -1,4 +1,5 @@
 """Staff RBAC, fully independent from anonymous visitor tokens."""
+
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -15,11 +16,14 @@ from app.db.session import get_db
 from app.models.staff import StaffRole, StaffSession, StaffUser
 
 bootstrap_key_scheme = APIKeyHeader(
-    name="X-Admin-Key", auto_error=False, scheme_name="BootstrapKey",
+    name="X-Admin-Key",
+    auto_error=False,
+    scheme_name="BootstrapKey",
     description="ONE-TIME bootstrap only. This is not a staff login token.",
 )
 staff_bearer_scheme = HTTPBearer(
-    auto_error=False, scheme_name="StaffBearer",
+    auto_error=False,
+    scheme_name="StaffBearer",
     description="Opaque token obtained from POST /api/v1/auth/login. Not the visitor token.",
 )
 
@@ -53,7 +57,11 @@ def require_staff(
         detail="Invalid or expired staff session",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    if credentials is None or credentials.scheme.lower() != "bearer" or len(credentials.credentials) > 200:
+    if (
+        credentials is None
+        or credentials.scheme.lower() != "bearer"
+        or len(credentials.credentials) > 200
+    ):
         raise unauthorized
     session = db.scalar(
         select(StaffSession).where(StaffSession.token_hash == digest_token(credentials.credentials))
@@ -83,8 +91,10 @@ def require_roles(*roles: StaffRole) -> Callable:
 
 def require_catalogue_reader(identity: StaffIdentity = Depends(require_staff)) -> StaffIdentity:
     allowed = {
-        StaffRole.PLATFORM_ADMIN.value, StaffRole.ACADEMIC_IIT.value,
-        StaffRole.ACADEMIC_ISB.value, StaffRole.DIRECTION.value,
+        StaffRole.PLATFORM_ADMIN.value,
+        StaffRole.ACADEMIC_IIT.value,
+        StaffRole.ACADEMIC_ISB.value,
+        StaffRole.DIRECTION.value,
     }
     if identity.user.role not in allowed:
         raise HTTPException(status_code=403, detail="Insufficient staff permissions")
@@ -93,7 +103,9 @@ def require_catalogue_reader(identity: StaffIdentity = Depends(require_staff)) -
 
 def require_catalogue_editor(identity: StaffIdentity = Depends(require_staff)) -> StaffIdentity:
     allowed = {
-        StaffRole.PLATFORM_ADMIN.value, StaffRole.ACADEMIC_IIT.value, StaffRole.ACADEMIC_ISB.value,
+        StaffRole.PLATFORM_ADMIN.value,
+        StaffRole.ACADEMIC_IIT.value,
+        StaffRole.ACADEMIC_ISB.value,
     }
     if identity.user.role not in allowed:
         raise HTTPException(status_code=403, detail="Insufficient staff permissions")
@@ -101,6 +113,9 @@ def require_catalogue_editor(identity: StaffIdentity = Depends(require_staff)) -
 
 
 def require_same_institution(identity: StaffIdentity, institution_id) -> None:
-    if identity.user.role not in {StaffRole.PLATFORM_ADMIN.value, StaffRole.DIRECTION.value} and identity.user.institution_id != institution_id:
+    if (
+        identity.user.role not in {StaffRole.PLATFORM_ADMIN.value, StaffRole.DIRECTION.value}
+        and identity.user.institution_id != institution_id
+    ):
         # Avoid disclosing whether another institution has a draft.
         raise HTTPException(status_code=404, detail="Programme not found")

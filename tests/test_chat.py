@@ -3,6 +3,7 @@
 The deterministic stub is test-only. The production provider always calls an
 actual configured OpenAI-compatible HTTP endpoint.
 """
+
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -10,7 +11,10 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.llm.provider import (
-    GeneratedReply, LLMUpstreamError, LLMUpstreamTimeout, get_llm_client,
+    GeneratedReply,
+    LLMUpstreamError,
+    LLMUpstreamTimeout,
+    get_llm_client,
 )
 from app.main import app
 from app.models.visitor import VisitorSession
@@ -85,7 +89,10 @@ def test_successful_chat_writes_both_messages_and_reuses_memory(client):
         ("user", "Tnajem tfasserli akther?"),
     ]
     assert [m["role"] for m in history(client, session)] == [
-        "user", "assistant", "user", "assistant"
+        "user",
+        "assistant",
+        "user",
+        "assistant",
     ]
 
 
@@ -101,7 +108,8 @@ def test_only_owner_can_chat(client):
     mine, other = new_session(client), new_session(client)
     result = client.post(
         f"{BASE}/{mine['id']}/chat",
-        headers={"X-Visitor-Token": other["token"]}, json={"content": "secret"}
+        headers={"X-Visitor-Token": other["token"]},
+        json={"content": "secret"},
     )
     assert result.status_code == 404
     assert history(client, mine) == []
@@ -139,7 +147,8 @@ def test_inflight_lease_blocks_overlapping_chat_and_raw_messages(client, test_en
     assert chat(client, session, "overlap").status_code == 409
     r = client.post(
         f"{BASE}/{session['id']}/messages",
-        headers={"X-Visitor-Token": session["token"]}, json={"content": "overlap"}
+        headers={"X-Visitor-Token": session["token"]},
+        json={"content": "overlap"},
     )
     assert r.status_code == 409
     assert history(client, session) == []
@@ -184,16 +193,34 @@ def test_snapshot_exposes_chat_endpoint_and_same_visitor_security(client):
 def test_published_catalogue_is_in_prompt_but_draft_is_not(client, headers, institution):
     fake = connected(client)
     draft = client.post(
-        "/api/v1/admin/programs", headers=headers,
-        json={"institution_id": institution["id"], "code": "DRAFT-TEST", "title": "Fake secret programme", "level": "LICENCE"}
+        "/api/v1/admin/programs",
+        headers=headers,
+        json={
+            "institution_id": institution["id"],
+            "code": "DRAFT-TEST",
+            "title": "Fake secret programme",
+            "level": "LICENCE",
+        },
     )
     assert draft.status_code == 201, draft.text
     pub = client.post(
-        "/api/v1/admin/programs", headers=headers,
-        json={"institution_id": institution["id"], "code": "PUBLISHED-TEST", "title": "Verified sample programme", "level": "ENGINEERING", "official_source_url": "https://example.org/verified", "verified_at": "2026-11-20T00:00:00Z"}
+        "/api/v1/admin/programs",
+        headers=headers,
+        json={
+            "institution_id": institution["id"],
+            "code": "PUBLISHED-TEST",
+            "title": "Verified sample programme",
+            "level": "ENGINEERING",
+            "official_source_url": "https://example.org/verified",
+            "verified_at": "2026-11-20T00:00:00Z",
+        },
     )
     assert pub.status_code == 201, pub.text
-    publish = client.patch(f"/api/v1/admin/programs/{pub.json()['id']}", json={"status": "PUBLISHED", "verified_at": "2026-11-20T00:00:00Z"}, headers=headers)
+    publish = client.patch(
+        f"/api/v1/admin/programs/{pub.json()['id']}",
+        json={"status": "PUBLISHED", "verified_at": "2026-11-20T00:00:00Z"},
+        headers=headers,
+    )
     assert publish.status_code == 200, publish.text
     session = new_session(client)
     response = chat(client, session, "Quelle formation ?")
@@ -206,6 +233,7 @@ def test_published_catalogue_is_in_prompt_but_draft_is_not(client, headers, inst
 def test_real_http_transport_is_wired_to_actual_conversation_history(client, monkeypatch):
     """One integrated TestClient -> DB -> HTTP transport -> DB flow (mock HTTP, not fake model)."""
     import httpx
+
     from app.llm import provider as model_provider
 
     connected(client)
@@ -215,13 +243,22 @@ def test_real_http_transport_is_wired_to_actual_conversation_history(client, mon
 
     def respond(request):
         import json
+
         payload = json.loads(request.content)
         calls.append(payload["messages"])
-        return httpx.Response(200, json={
-            "model": "test-transport-model", "choices": [{"message": {"content": "Réponse générée depuis HTTP de test"}}]
-        })
+        return httpx.Response(
+            200,
+            json={
+                "model": "test-transport-model",
+                "choices": [{"message": {"content": "Réponse générée depuis HTTP de test"}}],
+            },
+        )
 
-    monkeypatch.setattr(model_provider.httpx, "Client", lambda **kw: original_client(transport=httpx.MockTransport(respond), **kw))
+    monkeypatch.setattr(
+        model_provider.httpx,
+        "Client",
+        lambda **kw: original_client(transport=httpx.MockTransport(respond), **kw),
+    )
     session = new_session(client)
     assert chat(client, session, "question initiale").status_code == 201
     assert chat(client, session, "deuxième question").status_code == 201
@@ -235,8 +272,10 @@ def test_real_http_transport_is_wired_to_actual_conversation_history(client, mon
 
 def test_native_ollama_transport_preserves_two_turn_history(client, monkeypatch):
     """FastAPI -> PostgreSQL(test DB) -> Ollama native HTTP mock -> PostgreSQL."""
-    import httpx
     import json
+
+    import httpx
+
     from app.llm import provider as model_provider
 
     connected(client)
@@ -254,13 +293,21 @@ def test_native_ollama_transport_preserves_two_turn_history(client, monkeypatch)
         assert payload["think"] is False
         assert payload["stream"] is False
         calls.append(payload["messages"])
-        return httpx.Response(200, json={
-            "model": "qwen3.5:4b",
-            "message": {"role": "assistant", "content": "Ahla, na3ref!", "thinking": "not retained"},
-        })
+        return httpx.Response(
+            200,
+            json={
+                "model": "qwen3.5:4b",
+                "message": {
+                    "role": "assistant",
+                    "content": "Ahla, na3ref!",
+                    "thinking": "not retained",
+                },
+            },
+        )
 
     monkeypatch.setattr(
-        model_provider.httpx, "Client",
+        model_provider.httpx,
+        "Client",
         lambda **kw: original_client(transport=httpx.MockTransport(respond), **kw),
     )
     session = new_session(client)

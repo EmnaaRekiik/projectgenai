@@ -1,4 +1,5 @@
 """Dedicated retention worker, one per Compose deployment, no API lifecycle coupling."""
+
 import logging
 import signal
 import threading

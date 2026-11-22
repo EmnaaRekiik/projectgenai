@@ -1,4 +1,5 @@
 """Email verification challenge delivery over authenticated TLS SMTP."""
+
 import smtplib
 import ssl
 from email.message import EmailMessage
@@ -15,8 +16,9 @@ def send_verification_email(email: str, token: str, settings: Settings) -> bool:
     msg["Subject"] = "SmartCampus AI - Verify your email"
     msg.set_content(
         "Verify your SmartCampus AI account by sending this one-time token to "
-        "POST /api/v1/candidates/verify-email (field: token):\n\n" + token +
-        "\n\nThe token expires in 24 hours. Never share your password.\n"
+        "POST /api/v1/candidates/verify-email (field: token):\n\n"
+        + token
+        + "\n\nThe token expires in 24 hours. Never share your password.\n"
     )
     with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15) as server:
         server.ehlo()

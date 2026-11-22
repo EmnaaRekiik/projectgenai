@@ -2,7 +2,9 @@
 
 Set TEST_DATABASE_URL to a migrated, disposable PostgreSQL database for real-dialect tests.
 """
+
 import os
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,18 +12,29 @@ from sqlalchemy import create_engine, delete, event, inspect
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.auth.passwords import hash_password
+from app.auth.tokens import digest_token
 from app.core.config import Settings, get_settings
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.models import (
-    ConversationMessage, Institution, Program, VisitorSession, StaffUser, StaffSession, StaffRole,
-    ProgramSpecialization, ProgramCourse, ProgramAdmissionRule, ProgramTuition,
-    CandidateUser, CandidateSession, CandidateEmailToken, RateLimitBucket,
+    CandidateEmailToken,
+    CandidateSession,
+    CandidateUser,
+    ConversationMessage,
+    Institution,
+    Program,
+    ProgramAdmissionRule,
+    ProgramCourse,
+    ProgramSpecialization,
+    ProgramTuition,
+    RateLimitBucket,
+    StaffRole,
+    StaffSession,
+    StaffUser,
+    VisitorSession,
 )
-from app.auth.tokens import digest_token
-from app.auth.passwords import hash_password
-from datetime import datetime, timedelta, timezone
 
 TEST_KEY = "test-key-not-for-production-12345678901234567890"
 TEST_TOKEN = "test-staff-token-not-for-production-1"
@@ -38,23 +51,41 @@ def test_engine():
         inspector = inspect(engine)
         assert inspector.has_table("institutions"), "Apply the Alembic migration before testing"
         assert inspector.has_table("programs"), "Apply the Alembic migration before testing"
-        assert inspector.has_table("visitor_sessions"), "Apply the Alembic 0002 migration before testing"
-        assert inspector.has_table("conversation_messages"), "Apply the Alembic 0002 migration before testing"
-        assert "chat_request_id" in [c["name"] for c in inspector.get_columns("visitor_sessions")], "Apply Alembic 0003 before testing"
+        assert inspector.has_table("visitor_sessions"), (
+            "Apply the Alembic 0002 migration before testing"
+        )
+        assert inspector.has_table("conversation_messages"), (
+            "Apply the Alembic 0002 migration before testing"
+        )
+        assert "chat_request_id" in [
+            c["name"] for c in inspector.get_columns("visitor_sessions")
+        ], "Apply Alembic 0003 before testing"
         assert inspector.has_table("staff_users"), "Apply Alembic 0004 before testing"
         assert inspector.has_table("staff_sessions"), "Apply Alembic 0004 before testing"
-        for name in ("program_specializations", "program_courses", "program_admission_rules", "program_tuition",
-                     "candidate_users", "candidate_sessions", "candidate_email_tokens", "rate_limit_buckets"):
-            assert inspector.has_table(name), f"Apply Alembic 0005-0007 before testing: missing {name}"
+        for name in (
+            "program_specializations",
+            "program_courses",
+            "program_admission_rules",
+            "program_tuition",
+            "candidate_users",
+            "candidate_sessions",
+            "candidate_email_tokens",
+            "rate_limit_buckets",
+        ):
+            assert inspector.has_table(name), (
+                f"Apply Alembic 0005-0007 before testing: missing {name}"
+            )
     else:
         engine = create_engine(
             "sqlite+pysqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
         )
+
         @event.listens_for(engine, "connect")
         def _enable_foreign_keys(dbapi_connection, _record):
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.close()
+
         Base.metadata.create_all(engine)
     yield engine
     engine.dispose()
@@ -79,13 +110,23 @@ def client(test_engine):
         conn.execute(delete(Institution))
     factory = sessionmaker(bind=test_engine, expire_on_commit=False)
     with factory() as session:
-        admin = StaffUser(email="admin@example.org", display_name="Test Admin",
-                          password_hash=TEST_PASSWORD_HASH, role=StaffRole.PLATFORM_ADMIN.value,
-                          is_active=True, failed_login_count=0)
+        admin = StaffUser(
+            email="admin@example.org",
+            display_name="Test Admin",
+            password_hash=TEST_PASSWORD_HASH,
+            role=StaffRole.PLATFORM_ADMIN.value,
+            is_active=True,
+            failed_login_count=0,
+        )
         session.add(admin)
         session.flush()
-        session.add(StaffSession(user_id=admin.id, token_hash=digest_token(TEST_TOKEN),
-                                 expires_at=datetime.now(timezone.utc) + timedelta(hours=12)))
+        session.add(
+            StaffSession(
+                user_id=admin.id,
+                token_hash=digest_token(TEST_TOKEN),
+                expires_at=datetime.now(timezone.utc) + timedelta(hours=12),
+            )
+        )
         session.commit()
 
     def override_db():
@@ -112,7 +153,8 @@ def headers():
 @pytest.fixture
 def institution(client, headers):
     response = client.post(
-        "/api/v1/institutions", json={"code": "IIT", "name": "Institut International de Technologie"},
+        "/api/v1/institutions",
+        json={"code": "IIT", "name": "Institut International de Technologie"},
         headers=headers,
     )
     assert response.status_code == 201, response.text

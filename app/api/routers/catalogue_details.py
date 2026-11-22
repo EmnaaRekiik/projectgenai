@@ -3,6 +3,7 @@
 The public only sees details with verified HTTPS evidence belonging to a published programme.
 Staff can create/edit drafts; modifying substantive content invalidates prior verification.
 """
+
 import uuid
 from datetime import datetime, timezone
 
@@ -11,23 +12,43 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.security import StaffIdentity, require_catalogue_editor, require_catalogue_reader, require_same_institution
-from app.db.session import get_db
-from app.models.program import Program
-from app.models.catalogue_detail import ProgramSpecialization, ProgramCourse, ProgramAdmissionRule, ProgramTuition
-from app.schemas.program import ProgramStatus
-from app.schemas.catalogue_detail import (
-    SpecializationCreate, SpecializationPatch, SpecializationOut,
-    CourseCreate, CoursePatch, CourseOut,
-    AdmissionCreate, AdmissionPatch, AdmissionOut,
-    TuitionCreate, TuitionPatch, TuitionOut,
+from app.core.security import (
+    StaffIdentity,
+    require_catalogue_editor,
+    require_catalogue_reader,
+    require_same_institution,
 )
+from app.db.session import get_db
+from app.models.catalogue_detail import (
+    ProgramAdmissionRule,
+    ProgramCourse,
+    ProgramSpecialization,
+    ProgramTuition,
+)
+from app.models.program import Program
+from app.schemas.catalogue_detail import (
+    AdmissionCreate,
+    AdmissionOut,
+    AdmissionPatch,
+    CourseCreate,
+    CourseOut,
+    CoursePatch,
+    SpecializationCreate,
+    SpecializationOut,
+    SpecializationPatch,
+    TuitionCreate,
+    TuitionOut,
+    TuitionPatch,
+)
+from app.schemas.program import ProgramStatus
 
 public = APIRouter(prefix="/programs", tags=["Catalogue académique public"])
 admin = APIRouter(prefix="/admin/programs", tags=["Détails académiques : administration"])
 
 
-def _parent(db: Session, program_id: uuid.UUID, identity: StaffIdentity | None = None, public_only=False):
+def _parent(
+    db: Session, program_id: uuid.UUID, identity: StaffIdentity | None = None, public_only=False
+):
     program = db.get(Program, program_id)
     if program is None or (public_only and program.status != ProgramStatus.PUBLISHED.value):
         raise HTTPException(status_code=404, detail="Programme not found")
@@ -44,9 +65,17 @@ def _item(db, program_id, item_id, model):
 
 
 def _source_verified(item) -> bool:
-    return bool(item.verified_at and item.official_source_url and item.official_source_url.startswith("https://")
-                and (item.verified_at if item.verified_at.tzinfo else item.verified_at.replace(tzinfo=timezone.utc))
-                <= datetime.now(timezone.utc))
+    return bool(
+        item.verified_at
+        and item.official_source_url
+        and item.official_source_url.startswith("https://")
+        and (
+            item.verified_at
+            if item.verified_at.tzinfo
+            else item.verified_at.replace(tzinfo=timezone.utc)
+        )
+        <= datetime.now(timezone.utc)
+    )
 
 
 def _translate(model_data: dict):
@@ -62,7 +91,10 @@ def _verify(item):
     if item.verified_at is None:
         return
     if not _source_verified(item):
-        raise HTTPException(status_code=422, detail="Verification requires a non-future timestamp and official HTTPS source")
+        raise HTTPException(
+            status_code=422,
+            detail="Verification requires a non-future timestamp and official HTTPS source",
+        )
 
 
 def _commit(db: Session, item):
@@ -70,23 +102,35 @@ def _commit(db: Session, item):
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Academic detail conflicts with a catalogue constraint") from exc
+        raise HTTPException(
+            status_code=409, detail="Academic detail conflicts with a catalogue constraint"
+        ) from exc
     db.refresh(item)
     return item
 
 
 def _public_list(db, program_id, model, limit, offset):
     _parent(db, program_id, public_only=True)
-    stmt = select(model).where(model.program_id == program_id, model.verified_at.is_not(None),
-                               model.verified_at <= datetime.now(timezone.utc),
-                               model.official_source_url.like("https://%"))
+    stmt = select(model).where(
+        model.program_id == program_id,
+        model.verified_at.is_not(None),
+        model.verified_at <= datetime.now(timezone.utc),
+        model.official_source_url.like("https://%"),
+    )
     return list(db.scalars(stmt.order_by(model.created_at, model.id).offset(offset).limit(limit)))
 
 
 def _admin_list(db, program_id, model, identity, limit, offset):
     _parent(db, program_id, identity)
-    return list(db.scalars(select(model).where(model.program_id == program_id)
-        .order_by(model.created_at, model.id).offset(offset).limit(limit)))
+    return list(
+        db.scalars(
+            select(model)
+            .where(model.program_id == program_id)
+            .order_by(model.created_at, model.id)
+            .offset(offset)
+            .limit(limit)
+        )
+    )
 
 
 def _create(db, program_id, model, payload, identity):
@@ -101,12 +145,37 @@ def _patch(db, program_id, item_id, model, payload, identity):
     _parent(db, program_id, identity)
     item = _item(db, program_id, item_id, model)
     changes = _translate(payload.model_dump(exclude_unset=True))
-    immutable = {"code", "title", "specialization_id", "semester", "credits", "description", "kind", "label", "amount", "currency", "academic_year", "note"}
-    required = {"code", "title", "semester", "kind", "description", "label", "amount", "currency", "academic_year"}
+    immutable = {
+        "code",
+        "title",
+        "specialization_id",
+        "semester",
+        "credits",
+        "description",
+        "kind",
+        "label",
+        "amount",
+        "currency",
+        "academic_year",
+        "note",
+    }
+    required = {
+        "code",
+        "title",
+        "semester",
+        "kind",
+        "description",
+        "label",
+        "amount",
+        "currency",
+        "academic_year",
+    }
     if any(changes.get(field, "no-change") is None for field in required):
         raise HTTPException(status_code=422, detail="Required field cannot be null")
     # No stale 'verified' badge after editing a value. Require re-verification.
-    if (immutable.intersection(changes) or "official_source_url" in changes) and "verified_at" not in changes:
+    if (
+        immutable.intersection(changes) or "official_source_url" in changes
+    ) and "verified_at" not in changes:
         item.verified_at = None
     for field, value in changes.items():
         setattr(item, field, value)
@@ -126,125 +195,233 @@ def _delete(db, program_id, item_id, model, identity):
 # documents actual validation rules rather than opaque JSON dictionaries.
 
 
-@public.get("/{program_id}/specializations", response_model=list[SpecializationOut], summary="Public verified specializations")
-def public_specializations(program_id: uuid.UUID, limit: int = Query(50, ge=1, le=100),
-        offset: int = Query(0, ge=0), db: Session = Depends(get_db)):
+@public.get(
+    "/{program_id}/specializations",
+    response_model=list[SpecializationOut],
+    summary="Public verified specializations",
+)
+def public_specializations(
+    program_id: uuid.UUID,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
     return _public_list(db, program_id, ProgramSpecialization, limit, offset)
 
 
-@admin.get("/{program_id}/specializations", response_model=list[SpecializationOut], summary="Staff view of all specializations")
-def admin_specializations(program_id: uuid.UUID, limit: int = Query(50, ge=1, le=100),
-        offset: int = Query(0, ge=0), db: Session = Depends(get_db),
-        identity: StaffIdentity = Depends(require_catalogue_reader)):
+@admin.get(
+    "/{program_id}/specializations",
+    response_model=list[SpecializationOut],
+    summary="Staff view of all specializations",
+)
+def admin_specializations(
+    program_id: uuid.UUID,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    identity: StaffIdentity = Depends(require_catalogue_reader),
+):
     return _admin_list(db, program_id, ProgramSpecialization, identity, limit, offset)
 
 
 @admin.post("/{program_id}/specializations", response_model=SpecializationOut, status_code=201)
-def create_specializations(program_id: uuid.UUID, payload: SpecializationCreate, db: Session = Depends(get_db),
-        identity: StaffIdentity = Depends(require_catalogue_editor)):
+def create_specializations(
+    program_id: uuid.UUID,
+    payload: SpecializationCreate,
+    db: Session = Depends(get_db),
+    identity: StaffIdentity = Depends(require_catalogue_editor),
+):
     return _create(db, program_id, ProgramSpecialization, payload, identity)
 
 
 @admin.patch("/{program_id}/specializations/{item_id}", response_model=SpecializationOut)
-def patch_specializations(program_id: uuid.UUID, item_id: uuid.UUID, payload: SpecializationPatch,
-        db: Session = Depends(get_db), identity: StaffIdentity = Depends(require_catalogue_editor)):
+def patch_specializations(
+    program_id: uuid.UUID,
+    item_id: uuid.UUID,
+    payload: SpecializationPatch,
+    db: Session = Depends(get_db),
+    identity: StaffIdentity = Depends(require_catalogue_editor),
+):
     return _patch(db, program_id, item_id, ProgramSpecialization, payload, identity)
 
 
 @admin.delete("/{program_id}/specializations/{item_id}", status_code=204)
-def delete_specializations(program_id: uuid.UUID, item_id: uuid.UUID, db: Session = Depends(get_db),
-        identity: StaffIdentity = Depends(require_catalogue_editor)):
+def delete_specializations(
+    program_id: uuid.UUID,
+    item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    identity: StaffIdentity = Depends(require_catalogue_editor),
+):
     return _delete(db, program_id, item_id, ProgramSpecialization, identity)
 
 
-@public.get("/{program_id}/courses", response_model=list[CourseOut], summary="Public verified courses")
-def public_courses(program_id: uuid.UUID, limit: int = Query(50, ge=1, le=100),
-        offset: int = Query(0, ge=0), db: Session = Depends(get_db)):
+@public.get(
+    "/{program_id}/courses", response_model=list[CourseOut], summary="Public verified courses"
+)
+def public_courses(
+    program_id: uuid.UUID,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
     return _public_list(db, program_id, ProgramCourse, limit, offset)
 
 
-@admin.get("/{program_id}/courses", response_model=list[CourseOut], summary="Staff view of all courses")
-def admin_courses(program_id: uuid.UUID, limit: int = Query(50, ge=1, le=100),
-        offset: int = Query(0, ge=0), db: Session = Depends(get_db),
-        identity: StaffIdentity = Depends(require_catalogue_reader)):
+@admin.get(
+    "/{program_id}/courses", response_model=list[CourseOut], summary="Staff view of all courses"
+)
+def admin_courses(
+    program_id: uuid.UUID,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    identity: StaffIdentity = Depends(require_catalogue_reader),
+):
     return _admin_list(db, program_id, ProgramCourse, identity, limit, offset)
 
 
 @admin.post("/{program_id}/courses", response_model=CourseOut, status_code=201)
-def create_courses(program_id: uuid.UUID, payload: CourseCreate, db: Session = Depends(get_db),
-        identity: StaffIdentity = Depends(require_catalogue_editor)):
+def create_courses(
+    program_id: uuid.UUID,
+    payload: CourseCreate,
+    db: Session = Depends(get_db),
+    identity: StaffIdentity = Depends(require_catalogue_editor),
+):
     return _create(db, program_id, ProgramCourse, payload, identity)
 
 
 @admin.patch("/{program_id}/courses/{item_id}", response_model=CourseOut)
-def patch_courses(program_id: uuid.UUID, item_id: uuid.UUID, payload: CoursePatch,
-        db: Session = Depends(get_db), identity: StaffIdentity = Depends(require_catalogue_editor)):
+def patch_courses(
+    program_id: uuid.UUID,
+    item_id: uuid.UUID,
+    payload: CoursePatch,
+    db: Session = Depends(get_db),
+    identity: StaffIdentity = Depends(require_catalogue_editor),
+):
     return _patch(db, program_id, item_id, ProgramCourse, payload, identity)
 
 
 @admin.delete("/{program_id}/courses/{item_id}", status_code=204)
-def delete_courses(program_id: uuid.UUID, item_id: uuid.UUID, db: Session = Depends(get_db),
-        identity: StaffIdentity = Depends(require_catalogue_editor)):
+def delete_courses(
+    program_id: uuid.UUID,
+    item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    identity: StaffIdentity = Depends(require_catalogue_editor),
+):
     return _delete(db, program_id, item_id, ProgramCourse, identity)
 
 
-@public.get("/{program_id}/admission-rules", response_model=list[AdmissionOut], summary="Public verified admission-rules")
-def public_admission_rules(program_id: uuid.UUID, limit: int = Query(50, ge=1, le=100),
-        offset: int = Query(0, ge=0), db: Session = Depends(get_db)):
+@public.get(
+    "/{program_id}/admission-rules",
+    response_model=list[AdmissionOut],
+    summary="Public verified admission-rules",
+)
+def public_admission_rules(
+    program_id: uuid.UUID,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
     return _public_list(db, program_id, ProgramAdmissionRule, limit, offset)
 
 
-@admin.get("/{program_id}/admission-rules", response_model=list[AdmissionOut], summary="Staff view of all admission-rules")
-def admin_admission_rules(program_id: uuid.UUID, limit: int = Query(50, ge=1, le=100),
-        offset: int = Query(0, ge=0), db: Session = Depends(get_db),
-        identity: StaffIdentity = Depends(require_catalogue_reader)):
+@admin.get(
+    "/{program_id}/admission-rules",
+    response_model=list[AdmissionOut],
+    summary="Staff view of all admission-rules",
+)
+def admin_admission_rules(
+    program_id: uuid.UUID,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    identity: StaffIdentity = Depends(require_catalogue_reader),
+):
     return _admin_list(db, program_id, ProgramAdmissionRule, identity, limit, offset)
 
 
 @admin.post("/{program_id}/admission-rules", response_model=AdmissionOut, status_code=201)
-def create_admission_rules(program_id: uuid.UUID, payload: AdmissionCreate, db: Session = Depends(get_db),
-        identity: StaffIdentity = Depends(require_catalogue_editor)):
+def create_admission_rules(
+    program_id: uuid.UUID,
+    payload: AdmissionCreate,
+    db: Session = Depends(get_db),
+    identity: StaffIdentity = Depends(require_catalogue_editor),
+):
     return _create(db, program_id, ProgramAdmissionRule, payload, identity)
 
 
 @admin.patch("/{program_id}/admission-rules/{item_id}", response_model=AdmissionOut)
-def patch_admission_rules(program_id: uuid.UUID, item_id: uuid.UUID, payload: AdmissionPatch,
-        db: Session = Depends(get_db), identity: StaffIdentity = Depends(require_catalogue_editor)):
+def patch_admission_rules(
+    program_id: uuid.UUID,
+    item_id: uuid.UUID,
+    payload: AdmissionPatch,
+    db: Session = Depends(get_db),
+    identity: StaffIdentity = Depends(require_catalogue_editor),
+):
     return _patch(db, program_id, item_id, ProgramAdmissionRule, payload, identity)
 
 
 @admin.delete("/{program_id}/admission-rules/{item_id}", status_code=204)
-def delete_admission_rules(program_id: uuid.UUID, item_id: uuid.UUID, db: Session = Depends(get_db),
-        identity: StaffIdentity = Depends(require_catalogue_editor)):
+def delete_admission_rules(
+    program_id: uuid.UUID,
+    item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    identity: StaffIdentity = Depends(require_catalogue_editor),
+):
     return _delete(db, program_id, item_id, ProgramAdmissionRule, identity)
 
 
-@public.get("/{program_id}/tuition", response_model=list[TuitionOut], summary="Public verified tuition")
-def public_tuition(program_id: uuid.UUID, limit: int = Query(50, ge=1, le=100),
-        offset: int = Query(0, ge=0), db: Session = Depends(get_db)):
+@public.get(
+    "/{program_id}/tuition", response_model=list[TuitionOut], summary="Public verified tuition"
+)
+def public_tuition(
+    program_id: uuid.UUID,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
     return _public_list(db, program_id, ProgramTuition, limit, offset)
 
 
-@admin.get("/{program_id}/tuition", response_model=list[TuitionOut], summary="Staff view of all tuition")
-def admin_tuition(program_id: uuid.UUID, limit: int = Query(50, ge=1, le=100),
-        offset: int = Query(0, ge=0), db: Session = Depends(get_db),
-        identity: StaffIdentity = Depends(require_catalogue_reader)):
+@admin.get(
+    "/{program_id}/tuition", response_model=list[TuitionOut], summary="Staff view of all tuition"
+)
+def admin_tuition(
+    program_id: uuid.UUID,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    identity: StaffIdentity = Depends(require_catalogue_reader),
+):
     return _admin_list(db, program_id, ProgramTuition, identity, limit, offset)
 
 
 @admin.post("/{program_id}/tuition", response_model=TuitionOut, status_code=201)
-def create_tuition(program_id: uuid.UUID, payload: TuitionCreate, db: Session = Depends(get_db),
-        identity: StaffIdentity = Depends(require_catalogue_editor)):
+def create_tuition(
+    program_id: uuid.UUID,
+    payload: TuitionCreate,
+    db: Session = Depends(get_db),
+    identity: StaffIdentity = Depends(require_catalogue_editor),
+):
     return _create(db, program_id, ProgramTuition, payload, identity)
 
 
 @admin.patch("/{program_id}/tuition/{item_id}", response_model=TuitionOut)
-def patch_tuition(program_id: uuid.UUID, item_id: uuid.UUID, payload: TuitionPatch,
-        db: Session = Depends(get_db), identity: StaffIdentity = Depends(require_catalogue_editor)):
+def patch_tuition(
+    program_id: uuid.UUID,
+    item_id: uuid.UUID,
+    payload: TuitionPatch,
+    db: Session = Depends(get_db),
+    identity: StaffIdentity = Depends(require_catalogue_editor),
+):
     return _patch(db, program_id, item_id, ProgramTuition, payload, identity)
 
 
 @admin.delete("/{program_id}/tuition/{item_id}", status_code=204)
-def delete_tuition(program_id: uuid.UUID, item_id: uuid.UUID, db: Session = Depends(get_db),
-        identity: StaffIdentity = Depends(require_catalogue_editor)):
+def delete_tuition(
+    program_id: uuid.UUID,
+    item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    identity: StaffIdentity = Depends(require_catalogue_editor),
+):
     return _delete(db, program_id, item_id, ProgramTuition, identity)

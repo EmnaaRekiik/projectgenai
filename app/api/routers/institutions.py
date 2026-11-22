@@ -6,9 +6,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.security import require_roles
-from app.models.staff import StaffRole
 from app.db.session import get_db
 from app.models import Institution
+from app.models.staff import StaffRole
 from app.schemas.institution import InstitutionCreate, InstitutionOut
 
 router = APIRouter(prefix="/institutions", tags=["Institutions"])
@@ -34,9 +34,7 @@ def get_institution(institution_id: uuid.UUID, db: Session = Depends(get_db)) ->
     dependencies=[Depends(require_roles(StaffRole.PLATFORM_ADMIN))],
     summary="Add an institution (admin only)",
 )
-def create_institution(
-    payload: InstitutionCreate, db: Session = Depends(get_db)
-) -> Institution:
+def create_institution(payload: InstitutionCreate, db: Session = Depends(get_db)) -> Institution:
     institution = Institution(**payload.model_dump())
     db.add(institution)
     try:

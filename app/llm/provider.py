@@ -3,6 +3,7 @@
 The native Ollama endpoint supports explicitly disabling thinking on models
 that support the switch. No fake/simulated replies in production.
 """
+
 from dataclasses import dataclass
 from typing import Literal
 
@@ -70,7 +71,9 @@ class OpenAICompatibleClient:
             }
             url = settings.llm_base_url.rstrip("/") + "/chat/completions"
         try:
-            with httpx.Client(timeout=settings.llm_timeout_seconds, follow_redirects=False) as client:
+            with httpx.Client(
+                timeout=settings.llm_timeout_seconds, follow_redirects=False
+            ) as client:
                 result = client.post(url, json=request, headers=headers)
                 result.raise_for_status()
                 data = result.json()

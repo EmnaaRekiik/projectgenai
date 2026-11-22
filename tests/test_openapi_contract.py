@@ -1,4 +1,5 @@
 """Detect accidental changes to the documented Swagger API contract."""
+
 import json
 from pathlib import Path
 

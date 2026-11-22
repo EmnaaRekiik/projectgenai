@@ -3,6 +3,7 @@
 A short-lived lease is committed before the network call so the database is not
 locked during inference. Each successful turn commits user+assistant together.
 """
+
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -83,12 +84,14 @@ def chat(
     db.commit()  # release row lock BEFORE LLM inference
 
     try:
-        recent = list(db.scalars(
-            select(ConversationMessage)
-            .where(ConversationMessage.session_id == session_id)
-            .order_by(ConversationMessage.sequence.desc())
-            .limit(settings.llm_context_messages + 1)
-        ))
+        recent = list(
+            db.scalars(
+                select(ConversationMessage)
+                .where(ConversationMessage.session_id == session_id)
+                .order_by(ConversationMessage.sequence.desc())
+                .limit(settings.llm_context_messages + 1)
+            )
+        )
         history = list(reversed(recent[: settings.llm_context_messages]))
         truncated = len(recent) > settings.llm_context_messages
         catalogue, sources = verified_programme_context(db)
@@ -111,18 +114,23 @@ def chat(
         db.expire_all()  # discard pre-inference cached session state
         record = _owned_active_session(session_id, db, token, for_update=True)
         if record.chat_request_id != lease_id or (
-            record.chat_lease_until is None or _utc(record.chat_lease_until) <= datetime.now(timezone.utc)
+            record.chat_lease_until is None
+            or _utc(record.chat_lease_until) <= datetime.now(timezone.utc)
         ):
             raise HTTPException(status_code=409, detail="Chat lease expired; retry the request")
         if record.next_message_sequence + 1 > settings.visitor_max_messages:
             raise HTTPException(status_code=409, detail="Message limit reached")
 
         user_msg = ConversationMessage(
-            session_id=session_id, role="user", sequence=record.next_message_sequence,
+            session_id=session_id,
+            role="user",
+            sequence=record.next_message_sequence,
             content=payload.content,
         )
         assistant_msg = ConversationMessage(
-            session_id=session_id, role="assistant", sequence=record.next_message_sequence + 1,
+            session_id=session_id,
+            role="assistant",
+            sequence=record.next_message_sequence + 1,
             content=result.content.strip(),
         )
         db.add_all([user_msg, assistant_msg])

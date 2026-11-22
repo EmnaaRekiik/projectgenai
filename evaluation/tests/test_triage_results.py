@@ -1,10 +1,15 @@
 import json
 import tempfile
 import unittest
-from collections import Counter
 from pathlib import Path
 
-from evaluation.run_eval import BenchmarkError, DEFAULT_DATASET, load_cases, parse_args, selected_groups
+from evaluation.run_eval import (
+    DEFAULT_DATASET,
+    BenchmarkError,
+    load_cases,
+    parse_args,
+    selected_groups,
+)
 from evaluation.triage_results import latest_run, load_run, make_report
 
 
@@ -31,15 +36,42 @@ class TargetedEvaluationTests(unittest.TestCase):
 class TriageTests(unittest.TestCase):
     def test_inspect_full_run_without_mutating_evaluation_results(self):
         results = [
-            {"case_id": "MEM-06-T2", "turn": 2, "category": "memory", "language": "arabizi",
-             "auto_status": "FAIL", "prompt": "Chnowa?", "response": "analyste de donnees",
-             "expected_behavior": "Remember job", "auto_checks_failed": ["must_contain_any"], "reviewer_notes": ""},
-            {"case_id": "MEM-10-T1", "turn": 1, "category": "memory", "language": "arabizi",
-             "auto_status": "ERROR", "prompt": "Hi", "response": "", "expected_behavior": "Reply",
-             "auto_checks_failed": [], "reviewer_notes": "Backend returned HTTP 502 (POST)"},
-            {"case_id": "MEM-10-T2", "turn": 2, "category": "memory", "language": "arabizi",
-             "auto_status": "SKIPPED", "prompt": "Remember?", "response": "", "expected_behavior": "Recall",
-             "auto_checks_failed": [], "reviewer_notes": "Prior turn failed"},
+            {
+                "case_id": "MEM-06-T2",
+                "turn": 2,
+                "category": "memory",
+                "language": "arabizi",
+                "auto_status": "FAIL",
+                "prompt": "Chnowa?",
+                "response": "analyste de donnees",
+                "expected_behavior": "Remember job",
+                "auto_checks_failed": ["must_contain_any"],
+                "reviewer_notes": "",
+            },
+            {
+                "case_id": "MEM-10-T1",
+                "turn": 1,
+                "category": "memory",
+                "language": "arabizi",
+                "auto_status": "ERROR",
+                "prompt": "Hi",
+                "response": "",
+                "expected_behavior": "Reply",
+                "auto_checks_failed": [],
+                "reviewer_notes": "Backend returned HTTP 502 (POST)",
+            },
+            {
+                "case_id": "MEM-10-T2",
+                "turn": 2,
+                "category": "memory",
+                "language": "arabizi",
+                "auto_status": "SKIPPED",
+                "prompt": "Remember?",
+                "response": "",
+                "expected_behavior": "Recall",
+                "auto_checks_failed": [],
+                "reviewer_notes": "Prior turn failed",
+            },
         ]
         summary = {"dataset_sha256": "abc", "cleanup_warnings": []}
         with tempfile.TemporaryDirectory() as root:

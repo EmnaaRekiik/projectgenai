@@ -63,6 +63,8 @@ def compose_prompt(
         chars += needed
     truncated = len(included) < len(history)
     included.reverse()
-    system = ChatMessage(role="system", content=SYSTEM_INSTRUCTIONS + "\nDONNÉES VÉRIFIÉES:\n" + verified_catalogue)
+    system = ChatMessage(
+        role="system", content=SYSTEM_INSTRUCTIONS + "\nDONNÉES VÉRIFIÉES:\n" + verified_catalogue
+    )
     prior = [ChatMessage(role=m.role, content=m.content) for m in included]
     return [system, *prior, ChatMessage(role="user", content=question)], truncated

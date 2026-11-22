@@ -22,17 +22,30 @@ def test_missing_bootstrap_key_disables_bootstrap_access(client, institution):
         database_url="postgresql+psycopg://u:p@db:5432/test", admin_api_key=None
     )
     result = client.post(
-        "/api/v1/auth/bootstrap", json={"email": "foo@example.org", "display_name": "Foo Admin", "password": "Strong password 987654", "role": "PLATFORM_ADMIN"},
+        "/api/v1/auth/bootstrap",
+        json={
+            "email": "foo@example.org",
+            "display_name": "Foo Admin",
+            "password": "Strong password 987654",
+            "role": "PLATFORM_ADMIN",
+        },
         headers={"X-Admin-Key": "x" * 40},
     )
     assert result.status_code == 503
 
 
-def test_special_characters_in_db_password_are_preserved():
+def test_special_characters_in_db_password_are_preserved(monkeypatch):
+    for key in ("DATABASE_URL", "DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME"):
+        monkeypatch.delenv(key, raising=False)
+
     cfg = Settings(
-        db_host="db", db_user="demo", db_password="p@ss:/#word",
-        db_name="smartcampus", admin_api_key=None,
+        db_host="db",
+        db_user="demo",
+        db_password="p@ss:/#word",
+        db_name="smartcampus",
+        admin_api_key=None,
     )
+
     assert cfg.sqlalchemy_url.password == "p@ss:/#word"
     assert cfg.sqlalchemy_url.drivername == "postgresql+psycopg"
 

@@ -1,6 +1,16 @@
 from fastapi import FastAPI
 
-from app.api.routers import health, institutions, programs, visitors, chat, auth, staff, catalogue_details, candidates
+from app.api.routers import (
+    auth,
+    candidates,
+    catalogue_details,
+    chat,
+    health,
+    institutions,
+    programs,
+    staff,
+    visitors,
+)
 
 
 def create_app() -> FastAPI:

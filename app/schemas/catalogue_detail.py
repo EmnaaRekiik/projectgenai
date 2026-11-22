@@ -1,4 +1,5 @@
 """Typed contracts for programme specializations, courses, admission and tuition."""
+
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -13,10 +14,9 @@ class SourceFields(BaseModel):
     verified_at: datetime | None = None
 
 
-
-
 class DetailPatch(SourceFields):
     """Patch fields handled with exclude_unset; use a separate serializer per kind."""
+
     pass
 
 
@@ -27,7 +27,9 @@ class SpecializationCreate(SourceFields):
 
 
 class SpecializationPatch(SourceFields):
-    code: str | None = Field(default=None, min_length=2, max_length=50, pattern=r"^[A-Z0-9][A-Z0-9_-]*$")
+    code: str | None = Field(
+        default=None, min_length=2, max_length=50, pattern=r"^[A-Z0-9][A-Z0-9_-]*$"
+    )
     title: str | None = Field(default=None, min_length=2, max_length=180)
     description: str | None = Field(default=None, max_length=5000)
 
@@ -43,7 +45,9 @@ class CourseCreate(SourceFields):
 
 class CoursePatch(SourceFields):
     specialization_id: uuid.UUID | None = None
-    code: str | None = Field(default=None, min_length=2, max_length=50, pattern=r"^[A-Z0-9][A-Z0-9_-]*$")
+    code: str | None = Field(
+        default=None, min_length=2, max_length=50, pattern=r"^[A-Z0-9][A-Z0-9_-]*$"
+    )
     title: str | None = Field(default=None, min_length=2, max_length=180)
     semester: int | None = Field(default=None, ge=1, le=20)
     credits: int | None = Field(default=None, ge=0, le=60)

@@ -1,4 +1,5 @@
 """Contract/security/expiry/privacy coverage for SA-25 and SA-26."""
+
 import hashlib
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -7,9 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 import app.db.purge_expired as maintenance
-
 from app.models import ConversationMessage, VisitorSession
-
 
 BASE = "/api/v1/visitor/sessions"
 
@@ -25,8 +24,9 @@ def auth(created):
 
 
 def add(client, created, text):
-    return client.post(f"{BASE}/{created['id']}/messages",
-                       headers=auth(created), json={"content": text})
+    return client.post(
+        f"{BASE}/{created['id']}/messages", headers=auth(created), json={"content": text}
+    )
 
 
 def test_create_session_returns_opaque_one_time_token(client, test_engine):
@@ -35,7 +35,9 @@ def test_create_session_returns_opaque_one_time_token(client, test_engine):
     assert len(created["token"]) >= 40
     assert "token" not in client.get(f"{BASE}/{created['id']}", headers=auth(created)).json()
     with test_engine.connect() as conn:
-        row = conn.execute(select(VisitorSession).where(VisitorSession.id == uuid.UUID(created["id"])))
+        row = conn.execute(
+            select(VisitorSession).where(VisitorSession.id == uuid.UUID(created["id"]))
+        )
         # ORM select needs Session: check only through normal connection raw row mapping.
         stored = row.fetchone()
     assert stored is not None
@@ -56,7 +58,10 @@ def test_missing_wrong_and_cross_session_tokens_denied(client):
     assert client.get(url).status_code == 401
     assert client.get(url, headers={"X-Visitor-Token": "fake"}).status_code == 404
     assert client.get(url, headers=auth(second)).status_code == 404
-    assert client.post(url + "/messages", json={"content": "secret"}, headers=auth(second)).status_code == 404
+    assert (
+        client.post(url + "/messages", json={"content": "secret"}, headers=auth(second)).status_code
+        == 404
+    )
     assert client.get(url + "/context", headers=auth(second)).status_code == 404
     assert client.get(url + "/messages", headers=auth(second)).status_code == 404
     assert client.delete(url, headers=auth(second)).status_code == 404
@@ -73,7 +78,9 @@ def test_multi_turn_memory_stored_in_order(client):
     assert messages["total"] == 3
     assert [m["sequence"] for m in messages["items"]] == [1, 2, 3]
     assert [m["content"] for m in messages["items"]] == [
-        "Salem", "Nheb na9ra informatique", "Fasserli el licence"
+        "Salem",
+        "Nheb na9ra informatique",
+        "Fasserli el licence",
     ]
 
 
@@ -95,9 +102,13 @@ def test_last_messages_context_window_and_truncation(client):
     assert result.status_code == 200
     assert result.json()["truncated"] is True
     assert [item["content"] for item in result.json()["messages"]] == [
-        "question 4", "question 5", "question 6"
+        "question 4",
+        "question 5",
+        "question 6",
     ]
-    all_context = client.get(f"{BASE}/{created['id']}/context?limit=20", headers=auth(created)).json()
+    all_context = client.get(
+        f"{BASE}/{created['id']}/context?limit=20", headers=auth(created)
+    ).json()
     assert all_context["truncated"] is False
 
 
@@ -110,14 +121,24 @@ def test_paginated_messages(client):
     body = result.json()
     assert body["total"] == 5 and body["offset"] == 2
     assert [item["content"] for item in body["items"]] == ["message 2", "message 3"]
-    assert client.get(f"{BASE}/{created['id']}/messages?limit=0", headers=auth(created)).status_code == 422
-    assert client.get(f"{BASE}/{created['id']}/context?limit=31", headers=auth(created)).status_code == 422
+    assert (
+        client.get(f"{BASE}/{created['id']}/messages?limit=0", headers=auth(created)).status_code
+        == 422
+    )
+    assert (
+        client.get(f"{BASE}/{created['id']}/context?limit=31", headers=auth(created)).status_code
+        == 422
+    )
 
 
 def test_validation_and_no_client_assistant_impersonation(client):
     created = new_session(client)
-    for payload in ({"content": "   "}, {"content": ""}, {"content": "a" * 4001},
-                    {"content": "hello", "role": "assistant"}):
+    for payload in (
+        {"content": "   "},
+        {"content": ""},
+        {"content": "a" * 4001},
+        {"content": "hello", "role": "assistant"},
+    ):
         r = client.post(f"{BASE}/{created['id']}/messages", json=payload, headers=auth(created))
         assert r.status_code == 422, (payload.keys(), r.text)
     r = add(client, created, "   a real question   ")
@@ -128,6 +149,7 @@ def test_validation_and_no_client_assistant_impersonation(client):
 def test_max_message_count_enforced(client):
     from app.core.config import get_settings
     from app.main import app
+
     # The test fixture overrides get_settings, so also replace its override.
     original_override = app.dependency_overrides[get_settings]
     configured = original_override()
@@ -174,7 +196,8 @@ def test_retention_job_purges_expired_messages(client, test_engine, monkeypatch)
 
     # Mimic PostgreSQL's ON DELETE CASCADE in the SQLite-only fast-test double.
     with test_engine.connect() as conn:
-        conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+        if conn.dialect.name == "sqlite":
+            conn.exec_driver_sql("PRAGMA foreign_keys=ON")
     created = new_session(client)
     assert add(client, created, "temporary context").status_code == 201
     with Session(test_engine) as db:
@@ -185,4 +208,7 @@ def test_retention_job_purges_expired_messages(client, test_engine, monkeypatch)
     assert maintenance.purge_expired() == 1
     with Session(test_engine) as db:
         assert db.get(VisitorSession, uuid.UUID(created["id"])) is None
-        assert db.query(ConversationMessage).filter_by(session_id=uuid.UUID(created["id"])).count() == 0
+        assert (
+            db.query(ConversationMessage).filter_by(session_id=uuid.UUID(created["id"])).count()
+            == 0
+        )
