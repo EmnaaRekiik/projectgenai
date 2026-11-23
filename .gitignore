@@ -16,3 +16,9 @@ build/
 *.egg-info/
 .idea/
 .vscode/
+
+evaluation/models.json
+evaluation/results/
+
+evaluation/models.json
+evaluation/results/
