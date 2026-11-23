@@ -1,0 +1,35 @@
+{
+  "_comment": "Copiez ce fichier en evaluation/models.json et remplissez-le. Ne mettez JAMAIS de clé d'API ici : indiquez seulement le NOM de la variable d'environnement qui la contient (api_key_env). Ne renseignez un prix que s'il vient de la grille tarifaire officielle du fournisseur ; sinon laissez null (le coût sera affiché n/a).",
+  "profiles": [
+    {
+      "name": "local-qwen",
+      "provider": "ollama",
+      "base_url": "http://host.docker.internal:11434",
+      "model": "qwen3.5:4b",
+      "api_key_env": null,
+      "price_per_million_input_usd": 0,
+      "price_per_million_output_usd": 0,
+      "notes": "Modèle local déjà testé par le projet (Ollama sur la machine). Coût d'API nul."
+    },
+    {
+      "name": "api-modele-a",
+      "provider": "openai",
+      "base_url": "https://A_COMPLETER/v1",
+      "model": "A_COMPLETER",
+      "api_key_env": "LLM_KEY_MODELE_A",
+      "price_per_million_input_usd": null,
+      "price_per_million_output_usd": null,
+      "notes": "Modèle via une API compatible OpenAI. Mettre la clé dans la variable d'environnement LLM_KEY_MODELE_A avant de lancer le script."
+    },
+    {
+      "name": "api-modele-b",
+      "provider": "openai",
+      "base_url": "https://A_COMPLETER/v1",
+      "model": "A_COMPLETER",
+      "api_key_env": "LLM_KEY_MODELE_B",
+      "price_per_million_input_usd": null,
+      "price_per_million_output_usd": null,
+      "notes": "Deuxième modèle via API."
+    }
+  ]
+}
