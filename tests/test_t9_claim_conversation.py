@@ -218,3 +218,13 @@ def test_pagination_of_candidate_messages(client):
     page = client.get(f"{CONVERSATIONS}/{cid}/messages?limit=2&offset=2", headers=who).json()
     assert page["total"] == 5 and [m["sequence"] for m in page["items"]] == [3, 4]
     assert client.get(f"{CONVERSATIONS}/{cid}/messages?limit=0", headers=who).status_code == 422
+
+
+def test_claim_attempts_are_rate_limited(client):
+    who = candidate(client)
+    session_id, _ = visitor(client)
+    codes = [
+        claim(client, who, session_id, {"X-Visitor-Token": "wrong"}).status_code for _ in range(31)
+    ]
+    assert codes[:30] == [403] * 30
+    assert codes[30] == 429

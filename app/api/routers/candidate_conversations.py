@@ -15,13 +15,15 @@ import hmac
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, Security
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, Security
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.routers.candidates import CandidateIdentity, require_candidate
 from app.api.routers.visitors import visitor_token_scheme
+from app.core.config import Settings, get_settings
+from app.core.rate_limit import throttle_client
 from app.core.security import utc_aware
 from app.db.session import get_db
 from app.models.candidate_data import CandidateConversation, CandidateMessage
@@ -37,6 +39,7 @@ from app.schemas.candidate_conversation import (
 router = APIRouter(prefix="/candidates/me/conversations", tags=["Conversations du candidat"])
 
 TITLE_MAX = 180
+CLAIM_ATTEMPTS_PER_HOUR = 30  # slows down guessing of visitor session ids and tokens
 
 
 def _count(db: Session, conversation_id: uuid.UUID) -> int:
@@ -91,11 +94,21 @@ def _title_from(messages: list[ConversationMessage]) -> str | None:
 )
 def claim_visitor_conversation(
     payload: ClaimRequest,
+    request: Request,
     response: Response,
     identity: CandidateIdentity = Depends(require_candidate),
     visitor_token: str | None = Security(visitor_token_scheme),
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> ClaimOut:
+    throttle_client(
+        db,
+        request,
+        settings,
+        action=f"candidate_claim_{identity.user.id}",
+        limit=CLAIM_ATTEMPTS_PER_HOUR,
+        period_seconds=3600,
+    )
     if not visitor_token:
         raise HTTPException(status_code=401, detail="Missing visitor token")
     # Lock the visitor session so a double click or two devices cannot copy twice.

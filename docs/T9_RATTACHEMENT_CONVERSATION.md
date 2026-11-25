@@ -70,3 +70,13 @@ Après `POST /candidates/login`, si un jeton visiteur existe dans le navigateur,
 `tests/test_t9_claim_conversation.py` (12 tests) : copie ordonnée, visiteur intact, consentement, deux preuves, session d'un autre visiteur, inconnue, expirée, double clic, autre compte, session vide, chat en cours, purge visiteur, confidentialité entre candidats, suppression, pagination.
 
 Les tests SQLite n'exercent pas le verrou `FOR UPDATE` : le vérifier avec `TEST_DATABASE_URL` (CI PostgreSQL).
+
+## Revue de sécurité (auto-relecture)
+
+Points vérifiés : double preuve (jeton candidat + jeton visiteur), comparaison à temps constant, 404 identique pour « inexistant » et « à un autre », consentement obligatoire (422), copie en une transaction avec verrou et contrainte unique, suppression du compte candidat en cascade sur ses conversations, aucun jeton écrit en base ni journalisé, limite de 30 tentatives de rattachement par heure et par candidat (429).
+
+Limites connues, à connaître avant la mise en production :
+1. **Copie figée** : les messages échangés après le rattachement restent dans la session visiteur et ne sont pas recopiés. Le chat existant ne fonctionne qu'avec une session visiteur ; il n'existe pas encore de chat sur une conversation candidat. À traiter avec T13.
+2. **404 contre 403** : un candidat connecté peut savoir si un identifiant de session existe. Les identifiants sont des UUID aléatoires et la limite de tentatives rend l'énumération impraticable ; risque accepté.
+3. **Verrou `FOR UPDATE`** non exercé par les tests SQLite : à confirmer en CI PostgreSQL (`TEST_DATABASE_URL`).
+4. **Relecture non indépendante** : cette revue a été faite par l'auteur du code ; une relecture humaine de la PR reste préférable.
