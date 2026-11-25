@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from app.api.routers import (
     auth,
+    candidate_conversations,
     candidates,
     catalogue_details,
     chat,
@@ -36,6 +37,7 @@ def create_app() -> FastAPI:
     app.include_router(catalogue_details.public, prefix="/api/v1")
     app.include_router(catalogue_details.admin, prefix="/api/v1")
     app.include_router(candidates.router, prefix="/api/v1")
+    app.include_router(candidate_conversations.router, prefix="/api/v1")
     return app
 
 
