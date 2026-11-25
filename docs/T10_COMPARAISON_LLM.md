@@ -40,6 +40,23 @@ Le script change de modèle en recréant seulement le conteneur `api`, lance les
 
 ## 5. Relecture humaine (qualité)
 
+### Méthode recommandée : relecture à l'aveugle
+
+Un fichier unique présente, pour chaque question, les réponses de tous les modèles côte à côte, **sans nom de modèle** et dans un ordre mélangé (A, B, C). Le relecteur ne sait donc pas quel modèle il note.
+
+```powershell
+python evaluation\blind_review.py prepare          # crée evaluation\results\blind_review.csv et blind_key.json
+# ouvrir blind_review.csv dans Excel, remplir les colonnes A_*, B_*, C_* (0 à 3), NE PAS ouvrir blind_key.json
+# enregistrer sous "CSV UTF-8" (important pour l'arabe)
+python evaluation\blind_review.py merge            # recopie les notes dans chaque manual_review.csv
+.\scripts\benchmark_models.ps1 -CompareOnly
+```
+Par défaut la première répétition de chaque modèle est relue (`--which last` pour la dernière). Le séparateur par défaut est `;` (Excel en français) ; `--delimiter ","` sinon. Une case vide reste vide ; une note autre que 0, 1, 2, 3 arrête la fusion. Une copie `manual_review.csv.before_blind_merge` est conservée.
+
+La colonne `context_previous_user_message` rappelle ce que l'étudiant a dit au premier tour : elle sert à juger la **mémoire** sur les questions de second tour. Pour les autres questions, laisser `X_memory` vide.
+
+### Méthode manuelle (si besoin)
+
 Dans chaque `manual_review.csv` (ouvrir avec Excel), remplir pour chaque réponse, sur **0 à 3** :
 
 | Colonne | 0 | 3 |
